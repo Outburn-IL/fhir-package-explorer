@@ -1,0 +1,4 @@
+node_modules
+dist
+test/manual
+test/.test-cache
