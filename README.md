@@ -54,7 +54,7 @@ Factory method that installs context packages (and their dependencies) before re
 
 - `context` — **required**. Array of FHIR packages (strings or `{ id, version }`). Dependecies are automatically loaded.
 - `logger` — optional. Custom logger implementing `ILogger`.
-- `registryUrl`, `cachePath` — optional. Passed through to [`fhir-package-installer`](https://www.npmjs.com/package/fhir-package-installer).
+- `registryUrl`, `cachePath`, `skipExamples` — optional. Passed through to [`fhir-package-installer`](https://www.npmjs.com/package/fhir-package-installer).
 
 ---
 

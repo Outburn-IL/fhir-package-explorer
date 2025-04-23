@@ -6,6 +6,7 @@ import {
   ILogger
 } from 'fhir-package-installer';
 import fs from 'fs-extra';
+import path from 'path';
 
 export interface FileIndexEntryWithPkg extends FileInPackageIndex {
   __packageId: string;
@@ -17,6 +18,7 @@ export interface ExplorerConfig {
   registryUrl?: string;
   cachePath?: string;
   context: Array<string | PackageIdentifier>;
+  skipExamples?: boolean;
 }
 
 export interface LookupFilter extends Partial<FileInPackageIndex> {
@@ -31,6 +33,7 @@ export class FhirPackageExplorer {
   private contentCache = new Map<string, any>();
   private fastIndex = new Map<string, FileIndexEntryWithPkg[]>();
   private contextPackages: PackageIdentifier[] = [];
+  private skipExamples: boolean = false;
 
   static async create(config: ExplorerConfig): Promise<FhirPackageExplorer> {
     const instance = new FhirPackageExplorer(config);
@@ -39,14 +42,11 @@ export class FhirPackageExplorer {
   }
 
   private constructor(config: ExplorerConfig) {
-    const { logger, registryUrl, cachePath } = config || {} as ExplorerConfig;
-    this.fpi = new FhirPackageInstaller({
-      logger,
-      registryUrl,
-      cachePath
-    });
+    const { logger, registryUrl, cachePath, skipExamples } = config || {} as ExplorerConfig;
+    this.fpi = new FhirPackageInstaller({ logger, registryUrl, cachePath, skipExamples });
     this.logger = this.fpi.getLogger();
     this.cachePath = this.fpi.getCachePath();
+    if (skipExamples) this.skipExamples = skipExamples;
   }
 
   public getCachePath(): string {
@@ -60,13 +60,14 @@ export class FhirPackageExplorer {
   async lookup(filter: LookupFilter = {}): Promise<any[]> {
     const meta = await this.lookupMeta(filter);
     const results = await Promise.all(meta.map(async (entry) => {
-      const filePath = this.getFilePath(entry);
+      const filePath = await this.getFilePath(entry);
       if (this.contentCache.has(filePath)) return this.contentCache.get(filePath);
       const content = await this.loadJson(filePath);
       const enriched = {
-        ...content,
         __packageId: entry.__packageId,
-        __packageVersion: entry.__packageVersion
+        __packageVersion: entry.__packageVersion,
+        __filename: entry.filename,
+        ...content
       };
       this.contentCache.set(filePath, enriched);
       return enriched;
@@ -84,7 +85,8 @@ export class FhirPackageExplorer {
       allowedPackages = await this.collectDependencies(scopedPackage);
     }
 
-    const result: FileIndexEntryWithPkg[] = [];
+    const resultMap = new Map<string, FileIndexEntryWithPkg>();
+
     for (const pkg of pkgIdentifiers) {
       const pkgKey = `${pkg.id}#${pkg.version}`;
       if (allowedPackages && !allowedPackages.has(pkgKey)) continue;
@@ -100,27 +102,26 @@ export class FhirPackageExplorer {
           __packageVersion: pkg.version
         }));
         this.indexCache.set(pkgKey, index);
-        this.buildFastIndex(pkg.id, pkg.version, index);
+        this.buildFastIndex(index);
       }
 
-      const fastKey = this.buildFastIndexKey(normalizedFilter as FileIndexEntryWithPkg);
-      if (fastKey && this.fastIndex.has(fastKey)) {
-        result.push(...this.fastIndex.get(fastKey)!);
-        continue;
-      }
+      const fastKeys = this.getAllFastIndexKeys(normalizedFilter as FileIndexEntryWithPkg);
+      const fastCandidates = fastKeys.flatMap(k => this.fastIndex.get(k) ?? []);
 
-      const filtered = index.filter(file => {
-        for (const [key, value] of Object.entries(normalizedFilter)) {
-          if (key === 'package') continue;
-          if ((file as any)[key] !== value) return false;
+      const candidates = fastCandidates.length > 0 ? fastCandidates : index;
+
+      for (const entry of candidates) {
+        const entryPkgKey = `${entry.__packageId}#${entry.__packageVersion}`;
+        if (allowedPackages && !allowedPackages.has(entryPkgKey)) continue;
+        if (!this.matchesFilter(entry, normalizedFilter)) continue;
+        const compositeKey = `${entry.filename}|${entry.__packageId}|${entry.__packageVersion}`;
+        if (!resultMap.has(compositeKey)) {
+          resultMap.set(compositeKey, entry);
         }
-        return true;
-      });
-
-      result.push(...filtered);
+      }
     }
 
-    return result;
+    return Array.from(resultMap.values());
   }
 
   async resolve(filter: LookupFilter = {}): Promise<any> {
@@ -148,13 +149,14 @@ export class FhirPackageExplorer {
   private async loadContext(context: Array<string | PackageIdentifier>) {
     const resolved: PackageIdentifier[] = [];
     for (const entry of context) {
-      const pkg = await this.fpi.toPackageObject(entry as string);
+      const pkg = await this.fpi.toPackageObject(entry);
       await this.fpi.install(pkg);
       resolved.push(pkg);
 
       const deps = await this.fpi.getDependencies(pkg);
       for (const [id, version] of Object.entries(deps || {})) {
         const depPkg = { id, version };
+        if (this.skipExamples && depPkg.id.includes('examples')) continue;
         await this.fpi.install(depPkg);
         resolved.push(depPkg);
       }
@@ -172,6 +174,7 @@ export class FhirPackageExplorer {
       visited.add(key);
       const deps = await this.fpi.getDependencies(p);
       for (const [id, version] of Object.entries(deps || {})) {
+        if (this.skipExamples && id.includes('examples')) continue;
         await visit({ id, version });
       }
     };
@@ -194,6 +197,14 @@ export class FhirPackageExplorer {
     return newFilter;
   }
 
+  private matchesFilter(entry: FileIndexEntryWithPkg, filter: LookupFilter): boolean {
+    for (const [key, value] of Object.entries(filter)) {
+      if (key === 'package') continue;
+      if ((entry as any)[key] !== value) return false;
+    }
+    return true;
+  }
+
   private tryResolveSemver(matches: FileIndexEntryWithPkg[]): FileIndexEntryWithPkg[] {
     const groupedByPkg = new Map<string, string[]>();
     for (const entry of matches) {
@@ -209,37 +220,39 @@ export class FhirPackageExplorer {
     return matches.filter(m => m.__packageId === pkgId && m.version === latest);
   }
 
-  private getFilePath(entry: FileIndexEntryWithPkg): string {
-    const dir = this.fpi.getPackageDirPath({ id: entry.__packageId, version: entry.__packageVersion });
-    return `${dir}/package/${entry.filename}`;
+  private async getFilePath(entry: FileIndexEntryWithPkg): Promise<string> {
+    const dir = await this.fpi.getPackageDirPath({ id: entry.__packageId, version: entry.__packageVersion });
+    return path.join(dir, 'package', entry.filename);
   }
 
   private async loadJson(filePath: string): Promise<any> {
     return await fs.readJson(filePath);
   }
 
-  private buildFastIndex(pkgId: string, version: string, index: FileIndexEntryWithPkg[]) {
+  private buildFastIndex(index: FileIndexEntryWithPkg[]) {
     for (const file of index) {
-      const k = this.buildFastIndexKey(file);
-      if (k) {
-        if (!this.fastIndex.has(k)) this.fastIndex.set(k, []);
-        this.fastIndex.get(k)!.push(file);
+      for (const key of this.getAllFastIndexKeys(file)) {
+        if (!this.fastIndex.has(key)) this.fastIndex.set(key, []);
+        this.fastIndex.get(key)!.push(file);
       }
     }
   }
 
-  private buildFastIndexKey(entry: FileIndexEntryWithPkg): string | null {
+  private getAllFastIndexKeys(entry: FileIndexEntryWithPkg): string[] {
     const { __packageId, __packageVersion, resourceType, url, id, name, version } = entry;
-    if (__packageId && __packageVersion && resourceType && url) return `pkg:${__packageId}#${__packageVersion}|resourceType:${resourceType}|url:${url}`;
-    if (resourceType && url && version) return `resourceType:${resourceType}|url:${url}|version:${version}`;
-    if (resourceType && url) return `resourceType:${resourceType}|url:${url}`;
-    if (url && version) return `url:${url}|version:${version}`;
-    if (url) return `url:${url}`;
-    if (resourceType && name && version) return `resourceType:${resourceType}|name:${name}|version:${version}`;
-    if (resourceType && id && version) return `resourceType:${resourceType}|id:${id}|version:${version}`;
-    if (resourceType && name) return `resourceType:${resourceType}|name:${name}`;
-    if (resourceType && id) return `resourceType:${resourceType}|id:${id}`;
-    return null;
+    const keys: string[] = [];
+
+    if (__packageId && __packageVersion && resourceType && url) keys.push(`pkg:${__packageId}#${__packageVersion}|resourceType:${resourceType}|url:${url}`);
+    if (resourceType && url && version) keys.push(`resourceType:${resourceType}|url:${url}|version:${version}`);
+    if (resourceType && url) keys.push(`resourceType:${resourceType}|url:${url}`);
+    if (url && version) keys.push(`url:${url}|version:${version}`);
+    if (url) keys.push(`url:${url}`);
+    if (resourceType && name && version) keys.push(`resourceType:${resourceType}|name:${name}|version:${version}`);
+    if (resourceType && id && version) keys.push(`resourceType:${resourceType}|id:${id}|version:${version}`);
+    if (resourceType && name) keys.push(`resourceType:${resourceType}|name:${name}`);
+    if (resourceType && id) keys.push(`resourceType:${resourceType}|id:${id}`);
+
+    return keys;
   }
 }
 
