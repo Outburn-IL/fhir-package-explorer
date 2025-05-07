@@ -69,6 +69,13 @@ export class FhirPackageExplorer {
     return this.contextPackages;
   }
 
+  public async expandPackageDependencies(pkg: string | PackageIdentifier): Promise<PackageIdentifier[]> {
+    // expand the package into a list of packages including all transitive dependencies
+    const pkgObj = typeof pkg === 'string' ? await this.fpi.toPackageObject(pkg) : pkg;
+    const expanded: string[] = Array.from(await this.collectDependencies(pkgObj));
+    return sortPackages(await Promise.all(expanded.map(async (p) => await this.fpi.toPackageObject(p))));
+  }
+
   async lookup(filter: LookupFilter = {}): Promise<any[]> {
     const meta = await this.lookupMeta(filter);
     const results = await Promise.all(meta.map(async (entry) => {
