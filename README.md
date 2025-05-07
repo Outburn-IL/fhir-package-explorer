@@ -104,6 +104,12 @@ Returns the resolved cache directory used for storing FHIR packages.
 
 ---
 
+### `getContextPackages(): { id, version }[]`
+
+Returns the sorted, de-duplicated, dependency-resolved list of FHIR packages in context.
+
+---
+
 ## 🔧 LookupFilter
 
 You can filter using any combination of fields from the `.fpi.index.json`, including:

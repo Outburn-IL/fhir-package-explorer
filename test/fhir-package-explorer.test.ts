@@ -186,5 +186,28 @@ describe('FhirPackageExplorer', () => {
       package: 'hl7.fhir.r4.core#4.0.1'
     })).rejects.toThrow('No matching resource found');
   });
-}, 480000); // 8 minutes timeout
 
+  it('should have correct list of packages in context', () => {
+    const contextPackages = explorer.getContextPackages();
+    const contextPackagesEx = explorerWithExamples.getContextPackages();
+
+    expect(contextPackages).toStrictEqual([{
+      'id': 'hl7.fhir.r4.core',
+      'version': '4.0.1',
+    },{
+      'id': 'hl7.fhir.uv.sdc',
+      'version': '3.0.0',
+    }]);
+
+    expect(contextPackagesEx).toStrictEqual([{
+      'id': 'hl7.fhir.r4.core',
+      'version': '4.0.1',
+    },{
+      'id': 'hl7.fhir.r4.examples',
+      'version': '4.0.1',
+    },{
+      'id': 'hl7.fhir.uv.sdc',
+      'version': '3.0.0',
+    }]);
+  });
+}, 480000); // 8 minutes timeout

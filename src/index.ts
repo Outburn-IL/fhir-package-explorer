@@ -25,6 +25,14 @@ export interface LookupFilter extends Partial<FileInPackageIndex> {
   package?: string | PackageIdentifier;
 }
 
+const sortPackages = (arr: PackageIdentifier[]): PackageIdentifier[] => {
+  return arr.slice().sort((a, b) => {
+    const aKey = `${a.id}@${a.version}`;
+    const bKey = `${b.id}@${b.version}`;
+    return aKey < bKey ? -1 : aKey > bKey ? 1 : 0;
+  });
+};
+
 export class FhirPackageExplorer {
   private fpi: FhirPackageInstaller;
   private cachePath: string;
@@ -57,6 +65,10 @@ export class FhirPackageExplorer {
     return this.logger;
   }
 
+  public getContextPackages(): PackageIdentifier[] {
+    return this.contextPackages;
+  }
+
   async lookup(filter: LookupFilter = {}): Promise<any[]> {
     const meta = await this.lookupMeta(filter);
     const results = await Promise.all(meta.map(async (entry) => {
@@ -81,7 +93,7 @@ export class FhirPackageExplorer {
 
     let allowedPackages: Set<string> | undefined = undefined;
     if (normalizedFilter.package) {
-      const scopedPackage = await this.fpi.toPackageObject(normalizedFilter.package as string);
+      const scopedPackage = await this.fpi.toPackageObject(normalizedFilter.package);
       allowedPackages = await this.collectDependencies(scopedPackage);
     }
 
@@ -163,7 +175,7 @@ export class FhirPackageExplorer {
     }
     const deduped = new Map<string, PackageIdentifier>();
     for (const p of resolved) deduped.set(`${p.id}#${p.version}`, p);
-    this.contextPackages = Array.from(deduped.values());
+    this.contextPackages = sortPackages(Array.from(deduped.values()));
   }
 
   private async collectDependencies(pkg: PackageIdentifier): Promise<Set<string>> {
