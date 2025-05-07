@@ -25,7 +25,7 @@ export interface LookupFilter extends Partial<FileInPackageIndex> {
   package?: string | PackageIdentifier;
 }
 
-const sortPackages = (arr: PackageIdentifier[]) => {
+const sortPackages = (arr: PackageIdentifier[]): PackageIdentifier[] => {
   return arr.slice().sort((a, b) => {
     const aKey = `${a.id}@${a.version}`;
     const bKey = `${b.id}@${b.version}`;
