@@ -210,4 +210,29 @@ describe('FhirPackageExplorer', () => {
       'version': '3.0.0',
     }]);
   });
+
+  it('should correctly expand dependencies for package hl7.fhir.uv.sdc', async () => {
+    const expanded = await explorer.expandPackageDependencies('hl7.fhir.uv.sdc@3.0.0');
+    expect(expanded).toStrictEqual([{
+      'id': 'hl7.fhir.r4.core',
+      'version': '4.0.1',
+    },{
+      'id': 'hl7.fhir.uv.sdc',
+      'version': '3.0.0',
+    }]);
+  });
+
+  it('should correctly expand dependencies for package hl7.fhir.uv.sdc with examples', async () => {
+    const expanded = await explorerWithExamples.expandPackageDependencies('hl7.fhir.uv.sdc@3.0.0');
+    expect(expanded).toStrictEqual([{
+      'id': 'hl7.fhir.r4.core',
+      'version': '4.0.1',
+    },{
+      'id': 'hl7.fhir.r4.examples',
+      'version': '4.0.1',
+    },{
+      'id': 'hl7.fhir.uv.sdc',
+      'version': '3.0.0',
+    }]);
+  });
 }, 480000); // 8 minutes timeout
