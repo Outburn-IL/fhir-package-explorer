@@ -110,6 +110,12 @@ Returns the sorted, de-duplicated, dependency-resolved list of FHIR packages in 
 
 ---
 
+### `expandPackageDependencies(string | { id, version }): { id, version }[]`
+
+Expands a package into the full list of related packages. The returned array includes the requested package itself and all transitive dependecies, and is de-duplicated and sorted.
+
+---
+
 ## 🔧 LookupFilter
 
 You can filter using any combination of fields from the `.fpi.index.json`, including:
