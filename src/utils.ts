@@ -74,13 +74,33 @@ export const tryResolveSemver = (matches: FileIndexEntryWithPkg[]): FileIndexEnt
   for (const entry of matches) {
     const pkg = entry.__packageId;
     const v = entry.version;
-    if (!v || !/\d+\.\d+\.\d+/.test(v)) return [];
+    if (!v || !/^\d+\.\d+\.\d+(-[\w.-]+)?$/.test(v)) return [];
     if (!groupedByPkg.has(pkg)) groupedByPkg.set(pkg, []);
-      groupedByPkg.get(pkg)!.push(v);
+    groupedByPkg.get(pkg)!.push(v);
   }
+
   if (groupedByPkg.size !== 1) return [];
   const [pkgId, versions] = Array.from(groupedByPkg.entries())[0];
-  const latest = versions.sort((a, b) => (a > b ? 1 : -1)).pop();
+
+  function compareSemver(a: string, b: string): number {
+    const parse = (v: string) => {
+      const [core] = v.split('-');
+      const [major, minor, patch] = core.split('.').map(Number);
+      return { major, minor, patch };
+    };
+
+    const aParts = parse(a);
+    const bParts = parse(b);
+
+    if (aParts.major !== bParts.major) return aParts.major - bParts.major;
+    if (aParts.minor !== bParts.minor) return aParts.minor - bParts.minor;
+    if (aParts.patch !== bParts.patch) return aParts.patch - bParts.patch;
+
+    // Numeric parts are equal
+    return 0;
+  }
+
+  const latest = versions.slice().sort(compareSemver).pop();
   return matches.filter(m => m.__packageId === pkgId && m.version === latest);
 };
 
