@@ -114,9 +114,10 @@ export const loadJson = async (filePath: string): Promise<any> => {
  * @returns - An array of keys for the entry.
  */
 export const getAllFastIndexKeys = (entry: FileIndexEntryWithPkg): string[] => {
-  const { __packageId, __packageVersion, resourceType, url, id, name, version } = entry;
+  const { __packageId, __packageVersion, resourceType, url, id, name, version, derivation } = entry;
   const keys: string[] = [];
 
+  if (__packageId && __packageVersion && resourceType && id && derivation) keys.push(`pkg:${__packageId}#${__packageVersion}|resourceType:${resourceType}|id:${id}|derivation:${derivation}`);
   if (__packageId && __packageVersion && resourceType && url) keys.push(`pkg:${__packageId}#${__packageVersion}|resourceType:${resourceType}|url:${url}`);
   if (resourceType && url && version) keys.push(`resourceType:${resourceType}|url:${url}|version:${version}`);
   if (resourceType && url) keys.push(`resourceType:${resourceType}|url:${url}`);
