@@ -13,7 +13,8 @@
     "prepublishOnly": "npm run build",
     "pretest": "rimraf node_modules/fhir-package-explorer && npm run build && node -e \"require('./test/dist-to-module.cjs')()\"",
     "test": "vitest run",
-    "test:manual": "npm run build:test:manual && node test/manual/index.js"
+    "test:manual": "npm run build:test:manual && node test/manual/index.js",
+    "clear:cache": "rimraf test/.test-cache"
   },
   "keywords": [
     "fhir",
