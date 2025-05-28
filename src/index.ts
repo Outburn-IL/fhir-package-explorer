@@ -159,6 +159,13 @@ export class FhirPackageExplorer {
       const matches = await this.lookup(filter);
       if (matches.length === 0) throw this.prethrow(new Error('No matching resource found'));
       if (matches.length > 1) {
+        // if one of the matches is from the same package as in the filter, return that one
+        if (filter.package) {
+          const pkgIdentifier = await this.fpi.toPackageObject(filter.package);
+          const filteredMatches = matches.filter(m => m.__packageId === pkgIdentifier.id && m.__packageVersion === pkgIdentifier.version);
+          if (filteredMatches.length === 1) return filteredMatches[0];
+        }
+        // otherwise, try to resolve by semver: where matches are from different versions of the same package
         const candidates = tryResolveSemver(matches);
         if (candidates.length !== 1) throw this.prethrow(new Error('Multiple matching resources found'));
         return candidates[0];
