@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { PackageIdentifier } from 'fhir-package-installer';
+import { FhirPackageInstaller, PackageIdentifier } from 'fhir-package-installer';
 import { FileIndexEntryWithPkg, LookupFilter } from './types';
 import fs from 'fs-extra';
 
@@ -69,7 +69,14 @@ export const prethrow = (msg: Error | any): Error => {
  * @param matches 
  * @returns 
  */
-export const tryResolveSemver = (matches: FileIndexEntryWithPkg[]): FileIndexEntryWithPkg[] => {
+export const tryResolveDuplicates = async (matches: FileIndexEntryWithPkg[], filter: LookupFilter, fpi: FhirPackageInstaller): Promise<FileIndexEntryWithPkg[]> => {
+  // if one of the matches is from the same package as in the filter, return that one
+  if (filter.package) {
+    const pkgIdentifier = await fpi.toPackageObject(filter.package);
+    const filteredMatches = matches.filter(m => m.__packageId === pkgIdentifier.id && m.__packageVersion === pkgIdentifier.version);
+    if (filteredMatches.length === 1) return filteredMatches;
+  };
+  // otherwise, try to resolve by semver: where matches are from different versions of the same package
   const groupedByPkg = new Map<string, string[]>();
   for (const entry of matches) {
     const pkg = entry.__packageId;

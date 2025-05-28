@@ -8,7 +8,7 @@ import {
 import path from 'path';
 
 import { FileIndexEntryWithPkg, ExplorerConfig, LookupFilter } from './types';
-import { getAllFastIndexKeys, loadJson, matchesFilter, normalizePipedFilter, prethrow, sortPackages, tryResolveSemver } from './utils';
+import { getAllFastIndexKeys, loadJson, matchesFilter, normalizePipedFilter, prethrow, sortPackages, tryResolveDuplicates } from './utils';
 
 export class FhirPackageExplorer {
   private fpi: FhirPackageInstaller;
@@ -157,39 +157,30 @@ export class FhirPackageExplorer {
   public async resolve(filter: LookupFilter = {}): Promise<any> {
     try {
       const matches = await this.lookup(filter);
-      if (matches.length === 0) throw this.prethrow(new Error('No matching resource found'));
+      if (matches.length === 0) throw new Error(`No matching resource found with filter: ${JSON.stringify(filter)}`);
       if (matches.length > 1) {
-        // if one of the matches is from the same package as in the filter, return that one
-        if (filter.package) {
-          const pkgIdentifier = await this.fpi.toPackageObject(filter.package);
-          const filteredMatches = matches.filter(m => m.__packageId === pkgIdentifier.id && m.__packageVersion === pkgIdentifier.version);
-          if (filteredMatches.length === 1) return filteredMatches[0];
-        }
-        // otherwise, try to resolve by semver: where matches are from different versions of the same package
-        const candidates = tryResolveSemver(matches);
-        if (candidates.length !== 1) throw this.prethrow(new Error('Multiple matching resources found'));
+        const candidates = await tryResolveDuplicates(matches, filter, this.fpi);
+        if (candidates.length !== 1) throw new Error(`Multiple matching resources found with filter: ${JSON.stringify(filter)}`);
         return candidates[0];
       }
       return matches[0];
     } catch (error) {
-      this.logger.error(`Error resolving resource with filter: ${JSON.stringify(filter)}`);
-      throw this.prethrow(error);
+      throw this.prethrow(`Error resolving resource with filter: ${JSON.stringify(filter)}. Error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
   public async resolveMeta(filter: LookupFilter = {}): Promise<FileIndexEntryWithPkg> {
     try {
       const matches = await this.lookupMeta(filter);
-      if (matches.length === 0) throw this.prethrow(new Error('No matching resource found'));
+      if (matches.length === 0) throw new Error(`No matching resource found with filter: ${JSON.stringify(filter)}`);
       if (matches.length > 1) {
-        const candidates = tryResolveSemver(matches);
-        if (candidates.length !== 1) throw this.prethrow(new Error('Multiple matching resources found'));
+        const candidates = await tryResolveDuplicates(matches, filter, this.fpi);
+        if (candidates.length !== 1) throw new Error(`Multiple matching resources found with filter: ${JSON.stringify(filter)}`);
         return candidates[0];
       }
       return matches[0];
     } catch (error) {
-      this.logger.error(`Error resolving metadata with filter: ${JSON.stringify(filter)}`);
-      throw this.prethrow(error);
+      throw this.prethrow(`Error resolving metadata with filter: ${JSON.stringify(filter)}. Error: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
