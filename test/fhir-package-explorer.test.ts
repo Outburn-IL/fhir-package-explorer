@@ -18,11 +18,11 @@ describe('FhirPackageExplorer', () => {
       skipExamples: true
     });
     explorerWithExamples = await FhirPackageExplorer.create({
-      context: ['hl7.fhir.uv.sdc@3.0.0'],
+      context: ['hl7.fhir.uv.sdc@3.0.0', 'hl7.fhir.us.davinci-pdex#2.0.0'],
       cachePath: customCachePath
     });
 
-  }, 240000); // 4 minutes timeout
+  }, 360000); // 6 minutes timeout
 
   it('should have 728 StructureDefinitions in context', async () => {
     const meta = await explorer.lookupMeta({ resourceType: 'StructureDefinition' });
@@ -85,6 +85,25 @@ describe('FhirPackageExplorer', () => {
       id: 'Practitioner',
       url: 'http://hl7.org/fhir/StructureDefinition/Practitioner'
     })).rejects.toThrow('Multiple matching resources found');
+  });
+
+  // in the context of hl7.fhir.us.davinci-pdex@2.0.0, the url:
+  // http://hl7.org/fhir/us/davinci-pdex/StructureDefinition/extension-reviewAction
+  // matches two resources, one in the package itself and another in one of its dependencies.
+  // This test makes sure that the resolution succeeds when the package filter is used,
+  // and that the resource is returned from the correct package (hl7.fhir.us.davinci-pdex@2.0.0).
+  it('should resolve duplicate url by the package filter', async () => {
+    const url = 'http://hl7.org/fhir/us/davinci-pdex/StructureDefinition/extension-reviewAction';
+    const pkgIdentifier = { id: 'hl7.fhir.us.davinci-pdex', version: '2.0.0' };
+    const resolved = await explorerWithExamples.resolve({
+      resourceType: 'StructureDefinition',
+      url,
+      package: pkgIdentifier
+    });
+    expect(resolved.resourceType).toBe('StructureDefinition');
+    expect(resolved.url).toBe(url);
+    expect(resolved.__packageId).toBe(pkgIdentifier.id);
+    expect(resolved.__packageVersion).toBe(pkgIdentifier.version);
   });
 
   it('should resolve Observation StructureDefinition by URL', async () => {
@@ -205,9 +224,34 @@ describe('FhirPackageExplorer', () => {
     },{
       'id': 'hl7.fhir.r4.examples',
       'version': '4.0.1',
-    },{
+    },
+    {
+      'id': 'hl7.fhir.us.core',
+      'version': '3.1.1',
+    },
+    {
+      'id': 'hl7.fhir.us.davinci-hrex',
+      'version': '1.0.0',
+    },
+    {
+      'id': 'hl7.fhir.us.davinci-pas',
+      'version': '2.0.1',
+    },
+    {
+      'id': 'hl7.fhir.us.davinci-pdex',
+      'version': '2.0.0',
+    },
+    {
+      'id': 'hl7.fhir.uv.extensions.r4',
+      'version': '1.0.0',
+    },
+    {
       'id': 'hl7.fhir.uv.sdc',
       'version': '3.0.0',
+    },
+    {
+      'id': 'hl7.terminology.r4',
+      'version': '5.3.0',
     }]);
   });
 
