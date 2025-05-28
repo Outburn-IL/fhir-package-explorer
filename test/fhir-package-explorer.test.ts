@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { FhirPackageExplorer } from 'fhir-package-explorer';
 import path from 'path';
-import { remove } from 'fs-extra';
 
 describe('FhirPackageExplorer', () => {
 
@@ -10,15 +9,18 @@ describe('FhirPackageExplorer', () => {
   const customCachePath = path.join('test', '.test-cache');
 
   beforeAll(async () => {
-    // cleanup before running tests
-    await remove(customCachePath);
     explorer = await FhirPackageExplorer.create({
       context: ['hl7.fhir.uv.sdc@3.0.0'],
       cachePath: customCachePath,
       skipExamples: true
     });
     explorerWithExamples = await FhirPackageExplorer.create({
-      context: ['hl7.fhir.uv.sdc@3.0.0', 'hl7.fhir.us.davinci-pdex#2.0.0'],
+      context: [
+        'hl7.fhir.uv.sdc@3.0.0',
+        'hl7.fhir.us.davinci-pdex#2.0.0',
+        'hl7.fhir.us.core@6.1.0',
+        {'id':'hl7.fhir.us.davinci-crd','version':'2.0.0'}
+      ],
       cachePath: customCachePath
     });
 
@@ -230,6 +232,14 @@ describe('FhirPackageExplorer', () => {
       'version': '3.1.1',
     },
     {
+      'id': 'hl7.fhir.us.core',
+      'version': '6.1.0',
+    },
+    {
+      'id': 'hl7.fhir.us.davinci-crd',
+      'version': '2.0.0',
+    },
+    {
       'id': 'hl7.fhir.us.davinci-hrex',
       'version': '1.0.0',
     },
@@ -242,6 +252,10 @@ describe('FhirPackageExplorer', () => {
       'version': '2.0.0',
     },
     {
+      'id': 'hl7.fhir.uv.bulkdata',
+      'version': '2.0.0',
+    },
+    {
       'id': 'hl7.fhir.uv.extensions.r4',
       'version': '1.0.0',
     },
@@ -250,8 +264,28 @@ describe('FhirPackageExplorer', () => {
       'version': '3.0.0',
     },
     {
+      'id': 'hl7.fhir.uv.smart-app-launch',
+      'version': '2.1.0',
+    },
+    {
+      'id': 'hl7.terminology.r4',
+      'version': '5.0.0',
+    },
+    {
       'id': 'hl7.terminology.r4',
       'version': '5.3.0',
+    },
+    {
+      'id': 'ihe.formatcode.fhir',
+      'version': '1.1.0',
+    },
+    {
+      'id': 'us.cdc.phinvads',
+      'version': '0.12.0',
+    },
+    {
+      'id': 'us.nlm.vsac',
+      'version': '0.11.0',
     }]);
   });
 
@@ -279,4 +313,33 @@ describe('FhirPackageExplorer', () => {
       'version': '3.0.0',
     }]);
   });
+
+  it('should resolve known problematic resources', async () => {
+    const filters = [
+      {
+        'resourceType': 'StructureDefinition',
+        'url': 'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaireresponse',
+        'package': {
+          'id': 'hl7.fhir.us.core',
+          'version': '6.1.0'
+        }
+      },
+      {
+        'resourceType': 'StructureDefinition',
+        'url': 'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-task',
+        'package': {
+          'id': 'hl7.fhir.us.davinci-crd',
+          'version': '2.0.0'
+        }
+      }
+    ];
+    for (const filter of filters) {
+      const resolved = await explorerWithExamples.resolve(filter);
+      expect(resolved.resourceType).toBe(filter.resourceType);
+      expect(resolved.url).toBe(filter.url);
+      expect(resolved.__packageId).toBeDefined();
+      expect(resolved.__packageVersion).toBeDefined();
+    }
+  }
+  );
 }, 480000); // 8 minutes timeout
