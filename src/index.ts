@@ -24,7 +24,7 @@ export class FhirPackageExplorer {
   static async create(config: ExplorerConfig): Promise<FhirPackageExplorer> {
     const instance = new FhirPackageExplorer(config);
     try {
-      await instance.loadContext(config.context);
+      await instance._loadContext(config.context);
       return instance;
     } catch (error) {
       instance.logger.error('Error loading context packages');
@@ -61,6 +61,22 @@ export class FhirPackageExplorer {
   }
 
   /**
+   * Get the list of direct package dependencies for a given package.
+   * @param pkg - The package to expand. Can be a string or a PackageIdentifier object.
+   * @returns - A promise that resolves to an array of PackageIdentifier objects.
+   */
+  public async getDirectDependencies(pkg: string | PackageIdentifier): Promise<PackageIdentifier[]> {
+    try {
+      const pkgObj = typeof pkg === 'string' ? await this.fpi.toPackageObject(pkg) : pkg;
+      const dependencies = await this.fpi.getDependencies(pkgObj);
+      return Object.entries(dependencies).map(([id, version]) => ({ id, version }));
+    } catch (error) {
+      this.logger.error(`Error reading package dependencies for ${String(pkg)}`);
+      throw this.prethrow(error);
+    }
+  }
+  
+  /**
    * Expands the package into a list of packages including all transitive dependencies.
    * @param pkg - The package to expand. Can be a string or a PackageIdentifier object.
    * @returns - A promise that resolves to an array of PackageIdentifier objects representing the expanded packages.
@@ -68,20 +84,19 @@ export class FhirPackageExplorer {
   public async expandPackageDependencies(pkg: string | PackageIdentifier): Promise<PackageIdentifier[]> {
     try {
       const pkgObj = typeof pkg === 'string' ? await this.fpi.toPackageObject(pkg) : pkg;
-      const expanded: string[] = Array.from(await this.collectDependencies(pkgObj));
+      const expanded: string[] = Array.from(await this._collectDependencies(pkgObj));
       return sortPackages(await Promise.all(expanded.map(async (p) => await this.fpi.toPackageObject(p))));
     } catch (error) {
       this.logger.error(`Error expanding package dependencies for ${String(pkg)}`);
       throw this.prethrow(error);
     }
-    
   }
 
   public async lookup(filter: LookupFilter = {}): Promise<any[]> {
     try {
       const meta = await this.lookupMeta(filter);
       const results = await Promise.all(meta.map(async (entry) => {
-        const filePath = await this.getFilePath(entry);
+        const filePath = await this._getFilePath(entry);
         if (this.contentCache.has(filePath)) return this.contentCache.get(filePath);
         const content = await loadJson(filePath);
         const enriched = {
@@ -108,7 +123,7 @@ export class FhirPackageExplorer {
       let allowedPackages: Set<string> | undefined = undefined;
       if (normalizedFilter.package) {
         const scopedPackage = await this.fpi.toPackageObject(normalizedFilter.package);
-        allowedPackages = await this.collectDependencies(scopedPackage);
+        allowedPackages = await this._collectDependencies(scopedPackage);
       }
   
       const resultMap = new Map<string, FileIndexEntryWithPkg>();
@@ -128,7 +143,7 @@ export class FhirPackageExplorer {
             __packageVersion: pkg.version
           }));
           this.indexCache.set(pkgKey, index);
-          this.buildFastIndex(index);
+          this._buildFastIndex(index);
         }
   
         const fastKeys = getAllFastIndexKeys(normalizedFilter as FileIndexEntryWithPkg);
@@ -184,7 +199,17 @@ export class FhirPackageExplorer {
     }
   }
 
-  private async loadContext(context: Array<string | PackageIdentifier>) {
+  public async getPackageManifest(pkg: string | PackageIdentifier): Promise<any> {
+    try {
+      const meta = await this.fpi.getManifest(pkg);
+      if (!meta) throw new Error(`Failed to fetch manifest (package.json) for package: ${String(pkg)}`);
+      return meta;
+    } catch (error) {
+      throw this.prethrow(error);
+    }
+  }
+
+  private async _loadContext(context: Array<string | PackageIdentifier>) {
     const resolved: PackageIdentifier[] = [];
     for (const entry of context) {
       const pkg = await this.fpi.toPackageObject(entry);
@@ -204,7 +229,7 @@ export class FhirPackageExplorer {
     this.contextPackages = sortPackages(Array.from(deduped.values()));
   }
 
-  private async collectDependencies(pkg: PackageIdentifier): Promise<Set<string>> {
+  private async _collectDependencies(pkg: PackageIdentifier): Promise<Set<string>> {
     const visited = new Set<string>();
     const visit = async (p: PackageIdentifier) => {
       const key = `${p.id}#${p.version}`;
@@ -220,12 +245,12 @@ export class FhirPackageExplorer {
     return visited;
   }
 
-  private async getFilePath(entry: FileIndexEntryWithPkg): Promise<string> {
+  private async _getFilePath(entry: FileIndexEntryWithPkg): Promise<string> {
     const dir = await this.fpi.getPackageDirPath({ id: entry.__packageId, version: entry.__packageVersion });
     return path.join(dir, 'package', entry.filename);
   }
 
-  private buildFastIndex(index: FileIndexEntryWithPkg[]) {
+  private _buildFastIndex(index: FileIndexEntryWithPkg[]) {
     for (const file of index) {
       for (const key of getAllFastIndexKeys(file)) {
         if (!this.fastIndex.has(key)) this.fastIndex.set(key, []);
