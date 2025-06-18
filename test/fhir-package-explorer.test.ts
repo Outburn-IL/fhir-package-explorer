@@ -300,6 +300,15 @@ describe('FhirPackageExplorer', () => {
     }]);
   });
 
+  it('should correctly return manifest for package hl7.fhir.uv.sdc', async () => {
+    const manifest = await explorer.getPackageManifest('hl7.fhir.uv.sdc@3.0.0');
+    expect(manifest.name).toBe('hl7.fhir.uv.sdc');
+    expect(manifest.version).toBe('3.0.0');
+    expect(manifest.fhirVersions).toStrictEqual(['4.0.1']);
+    expect(manifest.dependencies).toBeTypeOf('object');
+    expect(manifest.dependencies['hl7.fhir.r4.core']).toBe('4.0.1');
+  });
+
   it('should correctly expand dependencies for package hl7.fhir.uv.sdc with examples', async () => {
     const expanded = await explorerWithExamples.expandPackageDependencies('hl7.fhir.uv.sdc@3.0.0');
     expect(expanded).toStrictEqual([{
@@ -345,7 +354,7 @@ describe('FhirPackageExplorer', () => {
       }
     ];
     for (const filter of filters) {
-      const resolved = await explorerWithExamples.resolve(filter);
+      const resolved = await explorerWithExamples.resolveMeta(filter);
       expect(resolved.resourceType).toBe(filter.resourceType);
       expect(resolved.url).toBe(filter.url);
       expect(resolved.__packageId).toBeDefined();
