@@ -314,7 +314,18 @@ describe('FhirPackageExplorer', () => {
     }]);
   });
 
-  it('should resolve known problematic resources', async () => {
+  it('should correctly get direct dependencies for package hl7.fhir.uv.sdc with examples', async () => {
+    const deps = await explorerWithExamples.getDirectDependencies('hl7.fhir.uv.sdc@3.0.0');
+    expect(deps).toStrictEqual([{
+      'id': 'hl7.fhir.r4.core',
+      'version': '4.0.1',
+    },{
+      'id': 'hl7.fhir.r4.examples',
+      'version': '4.0.1',
+    }]);
+  });
+
+  it('should resolve metadata for known problematic resources', async () => {
     const filters = [
       {
         'resourceType': 'StructureDefinition',

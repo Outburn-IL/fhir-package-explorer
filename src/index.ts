@@ -61,6 +61,22 @@ export class FhirPackageExplorer {
   }
 
   /**
+   * Get the list of direct package dependencies for a given package.
+   * @param pkg - The package to expand. Can be a string or a PackageIdentifier object.
+   * @returns - A promise that resolves to an array of PackageIdentifier objects.
+   */
+  public async getDirectDependencies(pkg: string | PackageIdentifier): Promise<PackageIdentifier[]> {
+    try {
+      const pkgObj = typeof pkg === 'string' ? await this.fpi.toPackageObject(pkg) : pkg;
+      const dependencies = await this.fpi.getDependencies(pkgObj);
+      return Object.entries(dependencies).map(([id, version]) => ({ id, version }));
+    } catch (error) {
+      this.logger.error(`Error reading package dependencies for ${String(pkg)}`);
+      throw this.prethrow(error);
+    }
+  }
+
+  /**
    * Expands the package into a list of packages including all transitive dependencies.
    * @param pkg - The package to expand. Can be a string or a PackageIdentifier object.
    * @returns - A promise that resolves to an array of PackageIdentifier objects representing the expanded packages.
