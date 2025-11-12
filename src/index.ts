@@ -33,8 +33,8 @@ export class FhirPackageExplorer {
   }
 
   private constructor(config: ExplorerConfig) {
-    const { logger, registryUrl, cachePath, skipExamples } = config || {} as ExplorerConfig;
-    this.fpi = new FhirPackageInstaller({ logger, registryUrl, cachePath, skipExamples });
+    const { logger, registryUrl, registryToken, cachePath, skipExamples } = config || {} as ExplorerConfig;
+    this.fpi = new FhirPackageInstaller({ logger, registryUrl, registryToken, cachePath, skipExamples });
     this.logger = this.fpi.getLogger();
     if (this.logger) this.prethrow = (msg: Error | any) => {
       if (!(msg instanceof Error)) {
