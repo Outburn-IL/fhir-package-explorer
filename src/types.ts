@@ -8,6 +8,7 @@ export interface FileIndexEntryWithPkg extends FileInPackageIndex {
 export interface ExplorerConfig {
   logger?: ILogger;
   registryUrl?: string;
+  registryToken?: string;
   cachePath?: string;
   context: Array<string | PackageIdentifier>;
   skipExamples?: boolean;

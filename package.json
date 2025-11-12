@@ -1,19 +1,28 @@
 {
   "name": "fhir-package-explorer",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "description": "Explore and resolve FHIR conformance resources across package contexts",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
   "author": "Outburn Ltd.",
   "license": "MIT",
   "scripts": {
-    "build": "rimraf dist && ncc build src/index.ts --external fs-extra --external fhir-package-installer --minify --no-cache --out dist",
-    "build:test:manual": "rimraf test/manual && ncc build test/manual.ts --minify --no-cache --out test/manual",
+    "build": "npm run clean && tsup",
+    "clean": "rimraf dist",
+    "build:test:manual": "rimraf test/manual && tsup test/manual.ts --format cjs --out-dir test/manual --minify",
     "prepublishOnly": "npm run build",
     "pretest": "rimraf node_modules/fhir-package-explorer && npm run build && node -e \"require('./test/dist-to-module.cjs')()\"",
     "test": "vitest run",
-    "test:manual": "npm run build:test:manual && node test/manual/index.js",
+    "test:manual": "npm run build:test:manual && node test/manual/manual.cjs",
     "clear:cache": "rimraf test/.test-cache"
   },
   "keywords": [
@@ -40,17 +49,17 @@
     "url": "git+https://github.com/Outburn-IL/fhir-package-explorer.git"
   },
   "dependencies": {
-    "fhir-package-installer": "^1.4.0",
-    "fs-extra": "^11.3.1"
+    "fhir-package-installer": "^1.5.2",
+    "fs-extra": "^11.3.2"
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
     "@types/fs-extra": "^11.0.4",
-    "@vercel/ncc": "^0.38.3",
-    "eslint": "^9.33.0",
-    "rimraf": "^6.0.1",
-    "typescript": "^5.9.2",
-    "typescript-eslint": "^8.39.1",
+    "eslint": "^9.39.1",
+    "rimraf": "^6.1.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.4",
     "vitest": "^3.2.4"
   }
 }
