@@ -122,6 +122,7 @@ const deps = await explorer.getDirectDependencies('hl7.fhir.uv.sdc@3.0.0');
 
 ### `getPackageManifest(pkg: string | { id, version }): Promise<any>`
 
+
 Returns the parsed `package.json` manifest for the specified FHIR package.
 
 **Example:**
@@ -132,6 +133,10 @@ const manifest = await explorer.getPackageManifest('hl7.fhir.uv.sdc@3.0.0');
 console.log(manifest.name); // 'hl7.fhir.uv.sdc'
 console.log(manifest.version); // '3.0.0'
 ```
+
+---
+
+### `getContextPackages(): { id, version }[]`
 
 Returns the sorted, de-duplicated, dependency-resolved list of FHIR packages in context.
 
