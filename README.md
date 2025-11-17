@@ -105,7 +105,33 @@ Returns the resolved cache directory used for storing FHIR packages.
 ---
 
 
-### `getContextPackages(): Promise<{ id, version }[]>`
+
+### `getDirectDependencies(pkg: string | { id, version }): Promise<{ id, version }[]>`
+
+Returns the direct dependencies of a given FHIR package (does not include transitive dependencies).
+
+**Example:**
+
+```ts
+const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0'] });
+const deps = await explorer.getDirectDependencies('hl7.fhir.uv.sdc@3.0.0');
+// deps: [ { id: 'hl7.fhir.r4.core', version: '4.0.1' }, { id: 'hl7.fhir.r4.examples', version: '4.0.1' } ]
+```
+
+---
+
+### `getPackageManifest(pkg: string | { id, version }): Promise<any>`
+
+Returns the parsed `package.json` manifest for the specified FHIR package.
+
+**Example:**
+
+```ts
+const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0'] });
+const manifest = await explorer.getPackageManifest('hl7.fhir.uv.sdc@3.0.0');
+console.log(manifest.name); // 'hl7.fhir.uv.sdc'
+console.log(manifest.version); // '3.0.0'
+```
 
 Returns the sorted, de-duplicated, dependency-resolved list of FHIR packages in context.
 
