@@ -211,52 +211,10 @@ describe('FhirPackageExplorer', () => {
   it('should have correct list of packages in context', () => {
     const contextPackages = explorer.getContextPackages();
     const contextPackagesEx = explorerWithExamples.getContextPackages();
-
-
-
-  describe('FhirPackageExplorer canonical minimal root normalization', () => {
-    it('should normalize roots for context: [hl7.fhir.uv.sdc@3.0.0]', async () => {
-      const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0'], cachePath: 'test/.test-cache', skipExamples: false });
-      expect(explorer.getNormalizedRootPackages()).toStrictEqual([
-        { id: 'hl7.fhir.uv.sdc', version: '3.0.0' }
-      ]);
-    });
-
-    it('should normalize roots for context: [hl7.fhir.uv.sdc@3.0.0, hl7.fhir.r4.core@4.0.1]', async () => {
-      const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0', 'hl7.fhir.r4.core@4.0.1'], cachePath: 'test/.test-cache', skipExamples: false });
-      expect(explorer.getNormalizedRootPackages()).toStrictEqual([
-        { id: 'hl7.fhir.uv.sdc', version: '3.0.0' }
-      ]);
-    });
-
-    it('should normalize roots for context: [hl7.fhir.uv.sdc@3.0.0, hl7.fhir.r4.core@4.0.1, hl7.fhir.r4.examples@4.0.1]', async () => {
-      const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0', 'hl7.fhir.r4.core@4.0.1', 'hl7.fhir.r4.examples@4.0.1'], cachePath: 'test/.test-cache', skipExamples: false });
-      expect(explorer.getNormalizedRootPackages()).toStrictEqual([
-        { id: 'hl7.fhir.uv.sdc', version: '3.0.0' }
-      ]);
-    });
-
-    it('should normalize roots for context: [hl7.fhir.uv.sdc@3.0.0, hl7.fhir.r4.examples@4.0.1]', async () => {
-      const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0', 'hl7.fhir.r4.examples@4.0.1'], cachePath: 'test/.test-cache', skipExamples: false });
-      expect(explorer.getNormalizedRootPackages()).toStrictEqual([
-        { id: 'hl7.fhir.uv.sdc', version: '3.0.0' }
-      ]);
-    });
-
-    it('should normalize roots for context: [hl7.fhir.r4.core@4.0.1, hl7.fhir.r4.examples@4.0.1]', async () => {
-      const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.r4.core@4.0.1', 'hl7.fhir.r4.examples@4.0.1'], cachePath: 'test/.test-cache', skipExamples: false });
-      expect(explorer.getNormalizedRootPackages()).toStrictEqual([
-        { id: 'hl7.fhir.r4.core', version: '4.0.1' },
-        { id: 'hl7.fhir.r4.examples', version: '4.0.1' }
-      ]);
-    });
-  });
-
     expect(contextPackages).toStrictEqual([
       { 'id': 'hl7.fhir.r4.core', 'version': '4.0.1' },
       { 'id': 'hl7.fhir.uv.sdc', 'version': '3.0.0' },
     ]);
-
     expect(contextPackagesEx).toStrictEqual([
       { 'id': 'hl7.fhir.r4.core', 'version': '4.0.1' },
       { 'id': 'hl7.fhir.r4.examples', 'version': '4.0.1' },
@@ -279,6 +237,44 @@ describe('FhirPackageExplorer', () => {
       { 'id': 'us.nlm.vsac', 'version': '0.11.0' },
     ]);
   });
+
+describe('FhirPackageExplorer canonical minimal root normalization', () => {
+  it('should normalize roots for context: [hl7.fhir.uv.sdc@3.0.0]', async () => {
+    const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0'], cachePath: 'test/.test-cache', skipExamples: false });
+    expect(explorer.getNormalizedRootPackages()).toStrictEqual([
+      { id: 'hl7.fhir.uv.sdc', version: '3.0.0' }
+    ]);
+  });
+
+  it('should normalize roots for context: [hl7.fhir.uv.sdc@3.0.0, hl7.fhir.r4.core@4.0.1]', async () => {
+    const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0', 'hl7.fhir.r4.core@4.0.1'], cachePath: 'test/.test-cache', skipExamples: false });
+    expect(explorer.getNormalizedRootPackages()).toStrictEqual([
+      { id: 'hl7.fhir.uv.sdc', version: '3.0.0' }
+    ]);
+  });
+
+  it('should normalize roots for context: [hl7.fhir.uv.sdc@3.0.0, hl7.fhir.r4.core@4.0.1, hl7.fhir.r4.examples@4.0.1]', async () => {
+    const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0', 'hl7.fhir.r4.core@4.0.1', 'hl7.fhir.r4.examples@4.0.1'], cachePath: 'test/.test-cache', skipExamples: false });
+    expect(explorer.getNormalizedRootPackages()).toStrictEqual([
+      { id: 'hl7.fhir.uv.sdc', version: '3.0.0' }
+    ]);
+  });
+
+  it('should normalize roots for context: [hl7.fhir.uv.sdc@3.0.0, hl7.fhir.r4.examples@4.0.1]', async () => {
+    const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0', 'hl7.fhir.r4.examples@4.0.1'], cachePath: 'test/.test-cache', skipExamples: false });
+    expect(explorer.getNormalizedRootPackages()).toStrictEqual([
+      { id: 'hl7.fhir.uv.sdc', version: '3.0.0' }
+    ]);
+  });
+
+  it('should normalize roots for context: [hl7.fhir.r4.core@4.0.1, hl7.fhir.r4.examples@4.0.1]', async () => {
+    const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.r4.core@4.0.1', 'hl7.fhir.r4.examples@4.0.1'], cachePath: 'test/.test-cache', skipExamples: false });
+    expect(explorer.getNormalizedRootPackages()).toStrictEqual([
+      { id: 'hl7.fhir.r4.core', version: '4.0.1' },
+      { id: 'hl7.fhir.r4.examples', version: '4.0.1' }
+    ]);
+  });
+});
 
   it('should correctly expand dependencies for package hl7.fhir.uv.sdc', async () => {
     const expanded = await explorer.expandPackageDependencies('hl7.fhir.uv.sdc@3.0.0');
