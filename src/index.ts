@@ -200,6 +200,13 @@ export class FhirPackageExplorer {
     }
   }
 
+  /**
+   * Get the manifest (package.json) for a given FHIR package.
+   * Returns the parsed manifest object for the specified package, or throws if not found.
+   *
+   * @param pkg - The package to fetch the manifest for (string or PackageIdentifier).
+   * @returns A promise that resolves to the manifest (package.json) object for the package.
+   */
   public async getPackageManifest(pkg: string | PackageIdentifier): Promise<any> {
     try {
       const meta = await this.fpi.getManifest(pkg);
