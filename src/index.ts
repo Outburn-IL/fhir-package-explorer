@@ -303,6 +303,13 @@ export class FhirPackageExplorer {
     }
   }
 
+  /**
+   * Get the normalized minimal set of root packages from the context.
+   * Returns only the root packages that are not dependencies of other root packages,
+   * effectively removing redundant entries from the originally provided context.
+   *
+   * @returns An array of PackageIdentifier objects representing the minimal root packages.
+   */
   public getNormalizedRootPackages(): PackageIdentifier[] {
     return this.normalizedRootPackages;
   }
