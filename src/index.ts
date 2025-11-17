@@ -18,6 +18,7 @@ export class FhirPackageExplorer {
   private contentCache = new Map<string, any>();
   private fastIndex = new Map<string, FileIndexEntryWithPkg[]>();
   private contextPackages: PackageIdentifier[] = [];
+  private normalizedRootPackages: PackageIdentifier[] = [];
   private skipExamples: boolean = false;
   private prethrow: (msg: Error | any) => Error = prethrow;
 
@@ -199,6 +200,13 @@ export class FhirPackageExplorer {
     }
   }
 
+  /**
+   * Get the manifest (package.json) for a given FHIR package.
+   * Returns the parsed manifest object for the specified package, or throws if not found.
+   *
+   * @param pkg - The package to fetch the manifest for (string or PackageIdentifier).
+   * @returns A promise that resolves to the manifest (package.json) object for the package.
+   */
   public async getPackageManifest(pkg: string | PackageIdentifier): Promise<any> {
     try {
       const meta = await this.fpi.getManifest(pkg);
@@ -210,23 +218,66 @@ export class FhirPackageExplorer {
   }
 
   private async _loadContext(context: Array<string | PackageIdentifier>) {
-    const resolved: PackageIdentifier[] = [];
+    // Resolve provided context entries into root packages (dedup first)
+    const rootMap = new Map<string, PackageIdentifier>();
     for (const entry of context) {
       const pkg = await this.fpi.toPackageObject(entry);
-      await this.fpi.install(pkg);
-      resolved.push(pkg);
+      rootMap.set(`${pkg.id}#${pkg.version}`, pkg);
+    }
+    const initialRoots = Array.from(rootMap.values());
 
-      const deps = await this.fpi.getDependencies(pkg);
-      for (const [id, version] of Object.entries(deps || {})) {
-        const depPkg = { id, version };
-        if (this.skipExamples && depPkg.id.includes('examples')) continue;
-        await this.fpi.install(depPkg);
-        resolved.push(depPkg);
+    // For each root, compute its full transitive dependency closure (including itself)
+    const rootClosures = new Map<string, Set<string>>();
+    const keyToPkg = new Map<string, PackageIdentifier>();
+    for (const root of initialRoots) {
+      await this.fpi.install(root); // ensure root is installed before dependency walk
+      const closure = await this._collectDependencies(root); // Set of id#version (includes root)
+      rootClosures.set(`${root.id}#${root.version}`, closure);
+      // Track all packages encountered for later object reconstruction
+      for (const key of closure) {
+        const [id, version] = key.split('#');
+        keyToPkg.set(key, { id, version });
       }
     }
-    const deduped = new Map<string, PackageIdentifier>();
-    for (const p of resolved) deduped.set(`${p.id}#${p.version}`, p);
-    this.contextPackages = sortPackages(Array.from(deduped.values()));
+
+    // Determine redundant roots: any root that appears in another root's closure
+    const redundant = new Set<string>();
+    const allRootKeys = Array.from(rootClosures.keys());
+    for (const [rootKey, closure] of rootClosures.entries()) {
+      for (const otherKey of allRootKeys) {
+        if (rootKey === otherKey) continue;
+        if (closure.has(otherKey)) {
+          // other root is covered by this root; mark redundant
+          redundant.add(otherKey);
+        }
+      }
+    }
+
+    // Minimal normalized root packages = roots not marked redundant
+    let minimalRoots = initialRoots.filter(r => !redundant.has(`${r.id}#${r.version}`));
+    // Handle pathological cycles where all roots ended up redundant (keep deterministic first root)
+    if (minimalRoots.length === 0 && initialRoots.length > 0) {
+      minimalRoots = [sortPackages(initialRoots)[0]];
+    }
+
+    // Build final full context package set = union of closures of minimal roots
+    const finalContextMap = new Map<string, PackageIdentifier>();
+    for (const mr of minimalRoots) {
+      const closure = rootClosures.get(`${mr.id}#${mr.version}`)!;
+      for (const key of closure) {
+        const pkgObj = keyToPkg.get(key);
+        if (pkgObj) finalContextMap.set(key, pkgObj);
+      }
+    }
+
+    // Install all packages in final context to ensure downstream availability
+    for (const pkg of finalContextMap.values()) {
+      await this.fpi.install(pkg);
+    }
+
+    // Store normalized roots (canonical ordering) and full context packages
+    this.normalizedRootPackages = sortPackages(minimalRoots);
+    this.contextPackages = sortPackages(Array.from(finalContextMap.values()));
   }
 
   private async _collectDependencies(pkg: PackageIdentifier): Promise<Set<string>> {
@@ -257,6 +308,17 @@ export class FhirPackageExplorer {
         this.fastIndex.get(key)!.push(file);
       }
     }
+  }
+
+  /**
+   * Get the normalized minimal set of root packages from the context.
+   * Returns only the root packages that are not dependencies of other root packages,
+   * effectively removing redundant entries from the originally provided context.
+   *
+   * @returns An array of PackageIdentifier objects representing the minimal root packages.
+   */
+  public getNormalizedRootPackages(): PackageIdentifier[] {
+    return this.normalizedRootPackages;
   }
 }
 

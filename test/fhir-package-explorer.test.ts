@@ -211,82 +211,31 @@ describe('FhirPackageExplorer', () => {
   it('should have correct list of packages in context', () => {
     const contextPackages = explorer.getContextPackages();
     const contextPackagesEx = explorerWithExamples.getContextPackages();
-
-    expect(contextPackages).toStrictEqual([{
-      'id': 'hl7.fhir.r4.core',
-      'version': '4.0.1',
-    },{
-      'id': 'hl7.fhir.uv.sdc',
-      'version': '3.0.0',
-    }]);
-
-    expect(contextPackagesEx).toStrictEqual([{
-      'id': 'hl7.fhir.r4.core',
-      'version': '4.0.1',
-    },{
-      'id': 'hl7.fhir.r4.examples',
-      'version': '4.0.1',
-    },
-    {
-      'id': 'hl7.fhir.us.core',
-      'version': '3.1.1',
-    },
-    {
-      'id': 'hl7.fhir.us.core',
-      'version': '6.1.0',
-    },
-    {
-      'id': 'hl7.fhir.us.davinci-crd',
-      'version': '2.0.0',
-    },
-    {
-      'id': 'hl7.fhir.us.davinci-hrex',
-      'version': '1.0.0',
-    },
-    {
-      'id': 'hl7.fhir.us.davinci-pas',
-      'version': '2.0.1',
-    },
-    {
-      'id': 'hl7.fhir.us.davinci-pdex',
-      'version': '2.0.0',
-    },
-    {
-      'id': 'hl7.fhir.uv.bulkdata',
-      'version': '2.0.0',
-    },
-    {
-      'id': 'hl7.fhir.uv.extensions.r4',
-      'version': '1.0.0',
-    },
-    {
-      'id': 'hl7.fhir.uv.sdc',
-      'version': '3.0.0',
-    },
-    {
-      'id': 'hl7.fhir.uv.smart-app-launch',
-      'version': '2.1.0',
-    },
-    {
-      'id': 'hl7.terminology.r4',
-      'version': '5.0.0',
-    },
-    {
-      'id': 'hl7.terminology.r4',
-      'version': '5.3.0',
-    },
-    {
-      'id': 'ihe.formatcode.fhir',
-      'version': '1.1.0',
-    },
-    {
-      'id': 'us.cdc.phinvads',
-      'version': '0.12.0',
-    },
-    {
-      'id': 'us.nlm.vsac',
-      'version': '0.11.0',
-    }]);
+    expect(contextPackages).toStrictEqual([
+      { 'id': 'hl7.fhir.r4.core', 'version': '4.0.1' },
+      { 'id': 'hl7.fhir.uv.sdc', 'version': '3.0.0' },
+    ]);
+    expect(contextPackagesEx).toStrictEqual([
+      { 'id': 'hl7.fhir.r4.core', 'version': '4.0.1' },
+      { 'id': 'hl7.fhir.r4.examples', 'version': '4.0.1' },
+      { 'id': 'hl7.fhir.us.core', 'version': '3.1.1' },
+      { 'id': 'hl7.fhir.us.core', 'version': '6.1.0' },
+      { 'id': 'hl7.fhir.us.davinci-crd', 'version': '2.0.0' },
+      { 'id': 'hl7.fhir.us.davinci-hrex', 'version': '1.0.0' },
+      { 'id': 'hl7.fhir.us.davinci-pas', 'version': '2.0.1' },
+      { 'id': 'hl7.fhir.us.davinci-pdex', 'version': '2.0.0' },
+      { 'id': 'hl7.fhir.us.udap-security', 'version': '0.1.0' },
+      { 'id': 'hl7.fhir.uv.bulkdata', 'version': '2.0.0' },
+      { 'id': 'hl7.fhir.uv.extensions.r4', 'version': '1.0.0' },
+      { 'id': 'hl7.fhir.uv.sdc', 'version': '3.0.0' },
+      { 'id': 'hl7.fhir.uv.smart-app-launch', 'version': '2.1.0' },
+      { 'id': 'hl7.fhir.uv.subscriptions-backport.r4', 'version': '1.1.0' },
+      { 'id': 'hl7.terminology.r4', 'version': '5.0.0' },
+      { 'id': 'hl7.terminology.r4', 'version': '5.3.0' },
+      { 'id': 'ihe.formatcode.fhir', 'version': '1.1.0' },
+      { 'id': 'us.cdc.phinvads', 'version': '0.12.0' },
+      { 'id': 'us.nlm.vsac', 'version': '0.11.0' },
+    ]);
   });
 
   it('should correctly expand dependencies for package hl7.fhir.uv.sdc', async () => {
@@ -363,3 +312,41 @@ describe('FhirPackageExplorer', () => {
   }
   );
 }, 480000); // 8 minutes timeout
+
+describe('FhirPackageExplorer canonical minimal root normalization', () => {
+  it('should normalize roots for context: [hl7.fhir.uv.sdc@3.0.0]', async () => {
+    const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0'], cachePath: 'test/.test-cache', skipExamples: false });
+    expect(explorer.getNormalizedRootPackages()).toStrictEqual([
+      { id: 'hl7.fhir.uv.sdc', version: '3.0.0' }
+    ]);
+  });
+
+  it('should normalize roots for context: [hl7.fhir.uv.sdc@3.0.0, hl7.fhir.r4.core@4.0.1]', async () => {
+    const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0', 'hl7.fhir.r4.core@4.0.1'], cachePath: 'test/.test-cache', skipExamples: false });
+    expect(explorer.getNormalizedRootPackages()).toStrictEqual([
+      { id: 'hl7.fhir.uv.sdc', version: '3.0.0' }
+    ]);
+  });
+
+  it('should normalize roots for context: [hl7.fhir.uv.sdc@3.0.0, hl7.fhir.r4.core@4.0.1, hl7.fhir.r4.examples@4.0.1]', async () => {
+    const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0', 'hl7.fhir.r4.core@4.0.1', 'hl7.fhir.r4.examples@4.0.1'], cachePath: 'test/.test-cache', skipExamples: false });
+    expect(explorer.getNormalizedRootPackages()).toStrictEqual([
+      { id: 'hl7.fhir.uv.sdc', version: '3.0.0' }
+    ]);
+  });
+
+  it('should normalize roots for context: [hl7.fhir.uv.sdc@3.0.0, hl7.fhir.r4.examples@4.0.1]', async () => {
+    const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.uv.sdc@3.0.0', 'hl7.fhir.r4.examples@4.0.1'], cachePath: 'test/.test-cache', skipExamples: false });
+    expect(explorer.getNormalizedRootPackages()).toStrictEqual([
+      { id: 'hl7.fhir.uv.sdc', version: '3.0.0' }
+    ]);
+  });
+
+  it('should normalize roots for context: [hl7.fhir.r4.core@4.0.1, hl7.fhir.r4.examples@4.0.1]', async () => {
+    const explorer = await FhirPackageExplorer.create({ context: ['hl7.fhir.r4.core@4.0.1', 'hl7.fhir.r4.examples@4.0.1'], cachePath: 'test/.test-cache', skipExamples: false });
+    expect(explorer.getNormalizedRootPackages()).toStrictEqual([
+      { id: 'hl7.fhir.r4.core', version: '4.0.1' },
+      { id: 'hl7.fhir.r4.examples', version: '4.0.1' }
+    ]);
+  });
+});
