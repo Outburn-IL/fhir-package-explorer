@@ -104,9 +104,30 @@ Returns the resolved cache directory used for storing FHIR packages.
 
 ---
 
+
 ### `getContextPackages(): Promise<{ id, version }[]>`
 
 Returns the sorted, de-duplicated, dependency-resolved list of FHIR packages in context.
+
+---
+
+### `getNormalizedRootPackages(): { id, version }[]`
+
+Returns the minimal, canonical set of root packages from the context. This is the smallest set of packages such that all other context packages are dependencies of these roots. Redundant roots (those that are dependencies of other roots) are removed.
+
+**Example:**
+
+```ts
+const explorer = await FhirPackageExplorer.create({
+  context: [
+    'hl7.fhir.uv.sdc@3.0.0',
+    'hl7.fhir.r4.core@4.0.1', // redundant, already a dependency of sdc
+    'hl7.fhir.r4.examples@4.0.1' // redundant, already a dependency of sdc
+  ]
+});
+console.log(explorer.getNormalizedRootPackages());
+// Output: [ { id: 'hl7.fhir.uv.sdc', version: '3.0.0' } ]
+```
 
 ---
 
