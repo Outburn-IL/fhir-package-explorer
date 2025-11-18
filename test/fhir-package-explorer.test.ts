@@ -367,14 +367,18 @@ describe('FhirPackageExplorer', () => {
     });
     
     // Look for a resource that might exist in multiple non-core packages
-    // If this doesn't find duplicates, the test will pass which is also correct behavior
     try {
-      await explorerNonCore.resolve({
+      const resolved = await explorerNonCore.resolve({
         resourceType: 'StructureDefinition',
         url: 'http://hl7.org/fhir/us/davinci-pdex/StructureDefinition/extension-reviewAction'
       });
-      // If it resolves without error, that's also acceptable (no duplicates found)
-      expect(true).toBe(true);
+      // If it resolves successfully, verify the resource has expected properties
+      expect(resolved.resourceType).toBe('StructureDefinition');
+      expect(resolved.url).toBe('http://hl7.org/fhir/us/davinci-pdex/StructureDefinition/extension-reviewAction');
+      expect(resolved.__packageId).toBeDefined();
+      expect(resolved.__packageVersion).toBeDefined();
+      // Verify it's not from a core package (since we excluded core packages)
+      expect(resolved.__packageId).not.toMatch(/^hl7\.fhir\.r\d+\.core$/);
     } catch (error: any) {
       // If it throws, it should be for multiple matches or no match found, which are both acceptable
       expect(error.message).toMatch(/(Multiple matching resources found|No matching resource found)/);
