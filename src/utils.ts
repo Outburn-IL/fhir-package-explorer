@@ -65,8 +65,15 @@ export const prethrow = (msg: Error | any): Error => {
 
 /**
  * When multiple matches are found, this function tries to resolve the duplicates by checking if the results come from different versions of the same package.
- * If so, it returns the match from the latest version of the package. Otherwise, it returns an empty array.
+ * If so, it returns the match from the latest version of the package. 
+ * 
+ * Core-bias resolution: If exactly one match is from a core/base package (hl7.fhir.rX.core), it is preferred as the canonical definition.
+ * This helps resolve naming collisions between base resources and their duplications in extension packages.
+ * 
+ * Otherwise, it returns an empty array.
  * @param matches 
+ * @param filter 
+ * @param fpi 
  * @returns 
  */
 export const tryResolveDuplicates = async (matches: FileIndexEntryWithPkg[], filter: LookupFilter, fpi: FhirPackageInstaller): Promise<FileIndexEntryWithPkg[]> => {
@@ -76,6 +83,13 @@ export const tryResolveDuplicates = async (matches: FileIndexEntryWithPkg[], fil
     const filteredMatches = matches.filter(m => m.__packageId === pkgIdentifier.id && m.__packageVersion === pkgIdentifier.version);
     if (filteredMatches.length === 1) return filteredMatches;
   };
+
+  // Core-bias: if exactly one match is from a core package, prefer it
+  const coreMatches = matches.filter(m => /^hl7\.fhir\.r\d+\.core$/.test(m.__packageId));
+  if (coreMatches.length === 1) {
+    return coreMatches;
+  }
+
   // otherwise, try to resolve by semver: where matches are from different versions of the same package
   const groupedByPkg = new Map<string, string[]>();
   for (const entry of matches) {
