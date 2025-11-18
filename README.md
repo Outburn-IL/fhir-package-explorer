@@ -82,13 +82,15 @@ Same as `lookup`, but returns the resource index metadata only.
 
 Returns a single matching resource. Throws if:
 - No match found
-- Multiple matches found **unless** they differ only by SemVer-compatible version
+- Multiple matches found **unless** they can be resolved by:
+  - SemVer-compatible versions of the same package, or
+  - **Core-bias resolution**: when exactly one match comes from a core/base package (`hl7.fhir.rX.core`), it is preferred as the canonical definition
 
 ---
 
 ### `resolveMeta(filter: LookupFilter): Promise<FileInPackageIndex>`
 
-Same as `resolve`, but returns metadata only.
+Same as `resolve`, but returns metadata only. Uses the same duplicate resolution logic including core-bias resolution.
 
 ---
 
@@ -165,6 +167,31 @@ console.log(explorer.getNormalizedRootPackages());
 ### `expandPackageDependencies(string | { id, version }): Promise<{ id, version }[]>`
 
 Expands a package into the full list of related packages. The returned array includes the requested package itself and all transitive dependencies, and is de-duplicated and sorted.
+
+---
+
+## 🎯 Duplicate Resolution
+
+When multiple resources match a filter, FhirPackageExplorer attempts to resolve duplicates intelligently:
+
+1. **Package Filter Priority**: If a `package` filter is provided and exactly one match comes from that package, it is returned.
+
+2. **Core-bias Resolution**: If exactly one match comes from a core/base package (matching pattern `hl7.fhir.rX.core`), it is preferred as the canonical definition. This helps resolve naming collisions between base FHIR resources and their duplicates in extension packages.
+
+3. **SemVer Resolution**: If matches come from different versions of the same package, the resource from the latest semantic version is returned.
+
+4. **Error**: If none of the above rules apply, an error is thrown for multiple matches.
+
+**Example:**
+```ts
+// If both hl7.fhir.r4.core and hl7.fhir.uv.extensions.r4 contain a 'language' StructureDefinition,
+// the one from hl7.fhir.r4.core will be preferred due to core-bias
+const resolved = await explorer.resolve({
+  resourceType: 'StructureDefinition',
+  id: 'language'
+});
+// resolved.__packageId === 'hl7.fhir.r4.core'
+```
 
 ---
 
