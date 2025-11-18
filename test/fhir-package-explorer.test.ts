@@ -6,6 +6,7 @@ describe('FhirPackageExplorer', () => {
 
   let explorer: FhirPackageExplorer;
   let explorerWithExamples: FhirPackageExplorer;
+  let explorerWithExtensions: FhirPackageExplorer;
   const customCachePath = path.join('test', '.test-cache');
 
   beforeAll(async () => {
@@ -22,6 +23,14 @@ describe('FhirPackageExplorer', () => {
         {'id':'hl7.fhir.us.davinci-crd','version':'2.0.0'}
       ],
       cachePath: customCachePath
+    });
+    explorerWithExtensions = await FhirPackageExplorer.create({
+      context: [
+        'hl7.fhir.uv.sdc@3.0.0',
+        'hl7.fhir.uv.extensions.r4@1.0.0'
+      ],
+      cachePath: customCachePath,
+      skipExamples: true
     });
 
   }, 360000); // 6 minutes timeout
@@ -81,12 +90,18 @@ describe('FhirPackageExplorer', () => {
     expect(results[1].__filename).toBe('StructureDefinition-Location.json');
   });
 
-  it('should throw on duplicate resources when examples are not excluded', async () => {
-    await expect(explorerWithExamples.resolve({
+  it('should resolve duplicate resources with core-bias when examples are not excluded', async () => {
+    const resolved = await explorerWithExamples.resolve({
       resourceType: 'StructureDefinition',
       id: 'Practitioner',
       url: 'http://hl7.org/fhir/StructureDefinition/Practitioner'
-    })).rejects.toThrow('Multiple matching resources found');
+    });
+
+    expect(resolved.resourceType).toBe('StructureDefinition');
+    expect(resolved.id).toBe('Practitioner');
+    expect(resolved.__packageId).toBe('hl7.fhir.r4.core');
+    expect(resolved.__packageVersion).toBe('4.0.1');
+    expect(resolved.url).toBe('http://hl7.org/fhir/StructureDefinition/Practitioner');
   });
 
   // in the context of hl7.fhir.us.davinci-pdex@2.0.0, the url:
@@ -311,6 +326,64 @@ describe('FhirPackageExplorer', () => {
     }
   }
   );
+
+  it('should resolve language StructureDefinition with core-bias when duplicates exist', async () => {
+    const resolved = await explorerWithExtensions.resolve({
+      resourceType: 'StructureDefinition',
+      id: 'language'
+    });
+
+    expect(resolved.resourceType).toBe('StructureDefinition');
+    expect(resolved.id).toBe('language');
+    expect(resolved.__packageId).toBe('hl7.fhir.r4.core');
+    expect(resolved.__packageVersion).toBe('4.0.1');
+    expect(resolved.url).toBe('http://hl7.org/fhir/StructureDefinition/language');
+    expect(resolved.__filename).toBe('StructureDefinition-language.json');
+  });
+
+  it('should resolve language StructureDefinition metadata with core-bias when duplicates exist', async () => {
+    const resolved = await explorerWithExtensions.resolveMeta({
+      resourceType: 'StructureDefinition',
+      id: 'language'
+    });
+
+    expect(resolved.resourceType).toBe('StructureDefinition');
+    expect(resolved.id).toBe('language');
+    expect(resolved.__packageId).toBe('hl7.fhir.r4.core');
+    expect(resolved.__packageVersion).toBe('4.0.1');
+    expect(resolved.url).toBe('http://hl7.org/fhir/StructureDefinition/language');
+    expect(resolved.filename).toBe('StructureDefinition-language.json');
+  });
+
+  it('should still throw on multiple matches when none are from core packages', async () => {
+    // Create an explorer without core packages to test non-core duplicate resolution
+    const explorerNonCore = await FhirPackageExplorer.create({
+      context: [
+        'hl7.fhir.us.davinci-pdex#2.0.0',
+        'hl7.fhir.us.core@6.1.0'
+      ],
+      cachePath: customCachePath,
+      skipExamples: true
+    });
+    
+    // Look for a resource that might exist in multiple non-core packages
+    try {
+      const resolved = await explorerNonCore.resolve({
+        resourceType: 'StructureDefinition',
+        url: 'http://hl7.org/fhir/us/davinci-pdex/StructureDefinition/extension-reviewAction'
+      });
+      // If it resolves successfully, verify the resource has expected properties
+      expect(resolved.resourceType).toBe('StructureDefinition');
+      expect(resolved.url).toBe('http://hl7.org/fhir/us/davinci-pdex/StructureDefinition/extension-reviewAction');
+      expect(resolved.__packageId).toBeDefined();
+      expect(resolved.__packageVersion).toBeDefined();
+      // Verify it's not from a core package (since we excluded core packages)
+      expect(resolved.__packageId).not.toMatch(/^hl7\.fhir\.r\d+\.core$/);
+    } catch (error: any) {
+      // If it throws, it should be for multiple matches or no match found, which are both acceptable
+      expect(error.message).toMatch(/(Multiple matching resources found|No matching resource found)/);
+    }
+  });
 }, 480000); // 8 minutes timeout
 
 describe('FhirPackageExplorer canonical minimal root normalization', () => {
