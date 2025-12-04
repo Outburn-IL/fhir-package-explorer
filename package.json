@@ -1,6 +1,6 @@
 {
   "name": "fhir-package-explorer",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "Explore and resolve FHIR conformance resources across package contexts",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -56,10 +56,10 @@
     "@eslint/js": "^9.24.0",
     "@types/fs-extra": "^11.0.4",
     "eslint": "^9.39.1",
-    "rimraf": "^6.1.0",
+    "rimraf": "^6.1.2",
     "tsup": "^8.5.1",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.47.0",
+    "typescript-eslint": "^8.48.1",
     "vitest": "^3.2.4"
   }
 }
