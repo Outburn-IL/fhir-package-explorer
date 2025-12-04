@@ -421,8 +421,8 @@ describe('FhirPackageExplorer', () => {
     expect(resolved.id).toBe('encounter-class');
   });
 
-  it('should force duplicate ValueSet resolution failure', async () => {
-    // Create a scenario where we manually install multiple versions to force duplicates
+  it('should handle explicit version conflicts in terminology packages', async () => {
+    // Create a scenario where we manually install multiple versions to test duplicate resolution
     // This simulates what might happen in the downstream project's cache
     
     // First, let's manually install multiple versions of terminology packages
