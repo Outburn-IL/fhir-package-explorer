@@ -64,46 +64,42 @@ export const prethrow = (msg: Error | any): Error => {
 };
 
 /**
- * When multiple matches are found, this function tries to resolve the duplicates by checking if the results come from different versions of the same package.
- * If so, it returns the match from the latest version of the package. 
+ * When multiple matches are found, this function tries to resolve the duplicates using a prioritized strategy.
  * 
- * Core-bias resolution: If exactly one match is from a core/base package (hl7.fhir.rX.core), it is preferred as the canonical definition.
- * This helps resolve naming collisions between base resources and their duplications in extension packages.
+ * Resolution strategies (in order of priority):
+ * 1. Package filter match - exact package match if specified in filter
+ * 2. Implicit-over-core bias - prefer implicit packages (terminology, extensions) over core packages
+ * 3. Resource type bias within implicit packages - terminology resources prefer terminology package, others prefer extensions
+ * 4. Implicit package version bias - higher package version wins (e.g.,terminology.rX 7.1.0 > 7.0.0) 
+ * 5. FHIR version bias - higher FHIR version wins when implicit package versions are equal (terminology.r5@7.0.0 > terminology.r4@7.0.0)
+ * 6. Semver resolution - latest version of the same package
  * 
- * Otherwise, it returns an empty array.
  * @param matches 
  * @param filter 
  * @param fpi 
  * @returns 
  */
 export const tryResolveDuplicates = async (matches: FileIndexEntryWithPkg[], filter: LookupFilter, fpi: FhirPackageInstaller): Promise<FileIndexEntryWithPkg[]> => {
-  // if one of the matches is from the same package as in the filter, return that one
+  // 1. Package filter match: if one of the matches is from the same package as in the filter, return that one
   if (filter.package) {
     const pkgIdentifier = await fpi.toPackageObject(filter.package);
     const filteredMatches = matches.filter(m => m.__packageId === pkgIdentifier.id && m.__packageVersion === pkgIdentifier.version);
     if (filteredMatches.length === 1) return filteredMatches;
+  }
+
+  // Helper functions for package classification
+  const isCorePackage = (packageId: string): boolean => /^hl7\.fhir\.r\d+\.core$/.test(packageId);
+  const isTerminologyPackage = (packageId: string): boolean => /^hl7\.terminology\.r\d+$/.test(packageId);
+  const isExtensionsPackage = (packageId: string): boolean => /^hl7\.fhir\.uv\.extensions\.r\d+$/.test(packageId);
+  const isImplicitPackage = (packageId: string): boolean => isTerminologyPackage(packageId) || isExtensionsPackage(packageId);
+  const isTerminologyResource = (resourceType: string): boolean => ['ValueSet', 'ConceptMap', 'CodeSystem'].includes(resourceType);
+
+  const extractFhirVersion = (packageId: string): number => {
+    const match = packageId.match(/\.r(\d+)$/);
+    return match ? parseInt(match[1], 10) : 0;
   };
 
-  // Core-bias: if exactly one match is from a core package, prefer it
-  const coreMatches = matches.filter(m => /^hl7\.fhir\.r\d+\.core$/.test(m.__packageId));
-  if (coreMatches.length === 1) {
-    return coreMatches;
-  }
-
-  // otherwise, try to resolve by semver: where matches are from different versions of the same package
-  const groupedByPkg = new Map<string, string[]>();
-  for (const entry of matches) {
-    const pkg = entry.__packageId;
-    const v = entry.version;
-    if (!v || !/^\d+\.\d+\.\d+(-[\w.-]+)?$/.test(v)) return [];
-    if (!groupedByPkg.has(pkg)) groupedByPkg.set(pkg, []);
-    groupedByPkg.get(pkg)!.push(v);
-  }
-
-  if (groupedByPkg.size !== 1) return [];
-  const [pkgId, versions] = Array.from(groupedByPkg.entries())[0];
-
-  function compareSemver(a: string, b: string): number {
+  const compareSemver = (a: string, b: string): number => {
     const parse = (v: string) => {
       const [core] = v.split('-');
       const [major, minor, patch] = core.split('.').map(Number);
@@ -116,10 +112,67 @@ export const tryResolveDuplicates = async (matches: FileIndexEntryWithPkg[], fil
     if (aParts.major !== bParts.major) return aParts.major - bParts.major;
     if (aParts.minor !== bParts.minor) return aParts.minor - bParts.minor;
     if (aParts.patch !== bParts.patch) return aParts.patch - bParts.patch;
-
-    // Numeric parts are equal
     return 0;
+  };
+
+  // 2. Implicit-over-core bias: implicit packages ALWAYS win over core packages
+  const coreMatches = matches.filter(m => isCorePackage(m.__packageId));
+  const implicitMatches = matches.filter(m => isImplicitPackage(m.__packageId));
+  
+  if (implicitMatches.length > 0 && coreMatches.length > 0) {
+    // Implicit packages always win over core packages (they're more up-to-date)
+    matches = implicitMatches;
+  } else if (coreMatches.length === 1 && implicitMatches.length === 0) {
+    // Traditional core-bias: if exactly one match is from core and no implicit packages, prefer core
+    return coreMatches;
+  } else if (implicitMatches.length > 0 && coreMatches.length === 0) {
+    // We have implicit matches but no core matches - prefer implicit packages
+    matches = implicitMatches;
   }
+
+  // 3. Resource type bias within implicit packages
+  if (matches.length > 1 && matches.every(m => isImplicitPackage(m.__packageId))) {
+    const terminologyMatches = matches.filter(m => isTerminologyPackage(m.__packageId));
+    const extensionsMatches = matches.filter(m => isExtensionsPackage(m.__packageId));
+    
+    if (terminologyMatches.length > 0 && extensionsMatches.length > 0) {
+      // We have matches in both implicit packages, use resource type to decide
+      if (filter.resourceType && isTerminologyResource(filter.resourceType)) {
+        matches = terminologyMatches;
+      } else {
+        matches = extensionsMatches;
+      }
+    }
+  }
+
+  // 4 & 5. Package version and FHIR version bias for implicit packages
+  if (matches.length > 1 && matches.every(m => isImplicitPackage(m.__packageId))) {
+    // Sort by package version (descending), then by FHIR version (descending)
+    matches.sort((a, b) => {
+      // First compare package versions
+      const versionComparison = compareSemver(b.__packageVersion, a.__packageVersion);
+      if (versionComparison !== 0) return versionComparison;
+      
+      // If package versions are equal, compare FHIR versions
+      return extractFhirVersion(b.__packageId) - extractFhirVersion(a.__packageId);
+    });
+    
+    // Return the best match (highest package version, then highest FHIR version)
+    return [matches[0]];
+  }
+
+  // 6. Semver resolution: try to resolve by semver where matches are from different versions of the same package
+  const groupedByPkg = new Map<string, string[]>();
+  for (const entry of matches) {
+    const pkg = entry.__packageId;
+    const v = entry.version;
+    if (!v || !/^\d+\.\d+\.\d+(-[\w.-]+)?$/.test(v)) return [];
+    if (!groupedByPkg.has(pkg)) groupedByPkg.set(pkg, []);
+    groupedByPkg.get(pkg)!.push(v);
+  }
+
+  if (groupedByPkg.size !== 1) return [];
+  const [pkgId, versions] = Array.from(groupedByPkg.entries())[0];
 
   const latest = versions.slice().sort(compareSemver).pop();
   return matches.filter(m => m.__packageId === pkgId && m.version === latest);

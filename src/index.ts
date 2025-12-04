@@ -176,7 +176,10 @@ export class FhirPackageExplorer {
       if (matches.length === 0) throw new Error(`No matching resource found with filter: ${JSON.stringify(filter)}`);
       if (matches.length > 1) {
         const candidates = await tryResolveDuplicates(matches, filter, this.fpi);
-        if (candidates.length !== 1) throw new Error(`Multiple matching resources found with filter: ${JSON.stringify(filter)}`);
+        if (candidates.length !== 1) {
+          const matchInfo = matches.map(m => `${m.__packageId}@${m.__packageVersion}`).join(', ');
+          throw new Error(`Multiple matching resources found with filter: ${JSON.stringify(filter)}. Found in packages: ${matchInfo}`);
+        }
         return candidates[0];
       }
       return matches[0];
@@ -191,7 +194,10 @@ export class FhirPackageExplorer {
       if (matches.length === 0) throw new Error(`No matching resource found with filter: ${JSON.stringify(filter)}`);
       if (matches.length > 1) {
         const candidates = await tryResolveDuplicates(matches, filter, this.fpi);
-        if (candidates.length !== 1) throw new Error(`Multiple matching resources found with filter: ${JSON.stringify(filter)}`);
+        if (candidates.length !== 1) {
+          const matchInfo = matches.map(m => `${m.__packageId}@${m.__packageVersion}`).join(', ');
+          throw new Error(`Multiple matching resources found with filter: ${JSON.stringify(filter)}. Found in packages: ${matchInfo}`);
+        }
         return candidates[0];
       }
       return matches[0];
