@@ -125,10 +125,13 @@ export const tryResolveDuplicates = async (matches: FileIndexEntryWithPkg[], fil
   } else if (coreMatches.length === 1 && implicitMatches.length === 0) {
     // Traditional core-bias: if exactly one match is from core and no implicit packages, prefer core
     return coreMatches;
+  } else if (implicitMatches.length > 0 && coreMatches.length === 0) {
+    // We have implicit matches but no core matches - prefer implicit packages
+    matches = implicitMatches;
   }
 
   // 3. Resource type bias within implicit packages
-  if (implicitMatches.length > 1) {
+  if (matches.length > 1 && matches.every(m => isImplicitPackage(m.__packageId))) {
     const terminologyMatches = matches.filter(m => isTerminologyPackage(m.__packageId));
     const extensionsMatches = matches.filter(m => isExtensionsPackage(m.__packageId));
     
