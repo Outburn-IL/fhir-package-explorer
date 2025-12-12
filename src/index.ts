@@ -1,11 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
   FhirPackageInstaller,
-  PackageIdentifier,
-  FileInPackageIndex,
-  ILogger
+  FileInPackageIndex
 } from 'fhir-package-installer';
 import path from 'path';
+import type { FhirPackageIdentifier as PackageIdentifier, Logger as ILogger } from '@outburn/types';
 
 import { FileIndexEntryWithPkg, ExplorerConfig, LookupFilter } from './types';
 import { getAllFastIndexKeys, loadJson, matchesFilter, normalizePipedFilter, prethrow, sortPackages, tryResolveDuplicates } from './utils';
@@ -138,13 +137,14 @@ export class FhirPackageExplorer {
           await this.fpi.install(pkg);
           const rawPkgIndex = await this.fpi.getPackageIndexFile(pkg);
           const rawIndex = rawPkgIndex.files ?? [];
-          index = rawIndex.map((file: FileInPackageIndex) => ({
+          const newIndex = rawIndex.map((file: FileInPackageIndex) => ({
             ...file,
             __packageId: pkg.id,
             __packageVersion: pkg.version
           }));
-          this.indexCache.set(pkgKey, index);
-          this._buildFastIndex(index);
+          this.indexCache.set(pkgKey, newIndex);
+          this._buildFastIndex(newIndex);
+          index = newIndex;
         }
   
         const fastKeys = getAllFastIndexKeys(normalizedFilter as FileIndexEntryWithPkg);

@@ -94,12 +94,20 @@ export const tryResolveDuplicates = async (matches: FileIndexEntryWithPkg[], fil
   const isImplicitPackage = (packageId: string): boolean => isTerminologyPackage(packageId) || isExtensionsPackage(packageId);
   const isTerminologyResource = (resourceType: string): boolean => ['ValueSet', 'ConceptMap', 'CodeSystem'].includes(resourceType);
 
-  const extractFhirVersion = (packageId: string): number => {
+  /**
+   * Extracts the FHIR version (e.g. 4 from r4) from an implicit package ID.
+   * This is only safe to call on packages validated by isImplicitPackage.
+   */
+  const extractFhirVersionFromImplicitPackageId = (packageId: string): number => {
     const match = packageId.match(/\.r(\d+)$/);
     return match ? parseInt(match[1], 10) : 0;
   };
 
-  const compareSemver = (a: string, b: string): number => {
+  const compareSemver = (a: string | undefined, b: string | undefined): number => {
+    if (!a && !b) return 0;
+    if (!a) return -1;
+    if (!b) return 1;
+
     const parse = (v: string) => {
       const [core] = v.split('-');
       const [major, minor, patch] = core.split('.').map(Number);
@@ -154,7 +162,7 @@ export const tryResolveDuplicates = async (matches: FileIndexEntryWithPkg[], fil
       if (versionComparison !== 0) return versionComparison;
       
       // If package versions are equal, compare FHIR versions
-      return extractFhirVersion(b.__packageId) - extractFhirVersion(a.__packageId);
+      return extractFhirVersionFromImplicitPackageId(b.__packageId) - extractFhirVersionFromImplicitPackageId(a.__packageId);
     });
     
     // Return the best match (highest package version, then highest FHIR version)
