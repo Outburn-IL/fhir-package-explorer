@@ -170,7 +170,7 @@ describe('FhirPackageExplorer', () => {
     })).rejects.toThrow('No matching resource found');;
   });
 
-  it('should resolve when using a PackageIdentifier filter', async () => {
+  it('should resolve when using a FhirPackageIdentifier filter', async () => {
     const resolved = await explorer.resolve({
       resourceType: 'StructureDefinition',
       url: 'http://hl7.org/fhir/StructureDefinition/Observation|4.0.1',

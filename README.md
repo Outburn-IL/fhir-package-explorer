@@ -53,7 +53,7 @@ const resolved = await explorer.resolve({
 Factory method that installs context packages (and their dependencies) before returning a ready-to-use instance.
 
 - `context` — **required**. Array of FHIR packages (strings or `{ id, version }`). Dependecies are automatically loaded.
-- `logger` — optional. Custom logger implementing `ILogger`.
+- `logger` — optional. Custom logger implementing `Logger`.
 - `registryUrl`, `registryToken`, `cachePath`, `skipExamples` — optional. Passed through to [`fhir-package-installer`](https://www.npmjs.com/package/fhir-package-installer).
 
 ---
@@ -94,7 +94,7 @@ Same as `resolve`, but returns metadata only. Uses the same duplicate resolution
 
 ---
 
-### `getLogger(): ILogger`
+### `getLogger(): Logger`
 
 Returns the internal logger used by this instance.
 

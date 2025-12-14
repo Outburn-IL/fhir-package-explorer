@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { FhirPackageInstaller, PackageIdentifier } from 'fhir-package-installer';
+import { FhirPackageInstaller } from 'fhir-package-installer';
+import type { FhirPackageIdentifier } from '@outburn/types';
 import { FileIndexEntryWithPkg, LookupFilter } from './types';
 import fs from 'fs-extra';
 
 /**
- * Sorts an array of PackageIdentifier objects by their id and version.
- * @param arr - The array of PackageIdentifier objects to sort.
+ * Sorts an array of FhirPackageIdentifier objects by their id and version.
+ * @param arr - The array of FhirPackageIdentifier objects to sort.
  * @returns 
  */
-export const sortPackages = (arr: PackageIdentifier[]): PackageIdentifier[] => {
+export const sortPackages = (arr: FhirPackageIdentifier[]): FhirPackageIdentifier[] => {
   return arr.slice().sort((a, b) => {
     const aKey = `${a.id}@${a.version}`;
     const bKey = `${b.id}@${b.version}`;

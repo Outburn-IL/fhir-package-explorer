@@ -4,7 +4,7 @@ import {
   FileInPackageIndex
 } from 'fhir-package-installer';
 import path from 'path';
-import type { FhirPackageIdentifier as PackageIdentifier, Logger as ILogger } from '@outburn/types';
+import type { FhirPackageIdentifier, Logger } from '@outburn/types';
 
 import { FileIndexEntryWithPkg, ExplorerConfig, LookupFilter } from './types';
 import { getAllFastIndexKeys, loadJson, matchesFilter, normalizePipedFilter, prethrow, sortPackages, tryResolveDuplicates } from './utils';
@@ -12,12 +12,12 @@ import { getAllFastIndexKeys, loadJson, matchesFilter, normalizePipedFilter, pre
 export class FhirPackageExplorer {
   private fpi: FhirPackageInstaller;
   private cachePath: string;
-  private logger: ILogger;
+  private logger: Logger;
   private indexCache = new Map<string, FileIndexEntryWithPkg[]>();
   private contentCache = new Map<string, any>();
   private fastIndex = new Map<string, FileIndexEntryWithPkg[]>();
-  private contextPackages: PackageIdentifier[] = [];
-  private normalizedRootPackages: PackageIdentifier[] = [];
+  private contextPackages: FhirPackageIdentifier[] = [];
+  private normalizedRootPackages: FhirPackageIdentifier[] = [];
   private skipExamples: boolean = false;
   private prethrow: (msg: Error | any) => Error = prethrow;
 
@@ -52,20 +52,20 @@ export class FhirPackageExplorer {
     return this.cachePath;
   }
 
-  public getLogger(): ILogger {
+  public getLogger(): Logger {
     return this.logger;
   }
 
-  public getContextPackages(): PackageIdentifier[] {
+  public getContextPackages(): FhirPackageIdentifier[] {
     return this.contextPackages;
   }
 
   /**
    * Get the list of direct package dependencies for a given package.
-   * @param pkg - The package to expand. Can be a string or a PackageIdentifier object.
-   * @returns - A promise that resolves to an array of PackageIdentifier objects.
+   * @param pkg - The package to expand. Can be a string or a FhirPackageIdentifier object.
+   * @returns - A promise that resolves to an array of FhirPackageIdentifier objects.
    */
-  public async getDirectDependencies(pkg: string | PackageIdentifier): Promise<PackageIdentifier[]> {
+  public async getDirectDependencies(pkg: string | FhirPackageIdentifier): Promise<FhirPackageIdentifier[]> {
     try {
       const pkgObj = typeof pkg === 'string' ? await this.fpi.toPackageObject(pkg) : pkg;
       const dependencies = await this.fpi.getDependencies(pkgObj);
@@ -78,10 +78,10 @@ export class FhirPackageExplorer {
   
   /**
    * Expands the package into a list of packages including all transitive dependencies.
-   * @param pkg - The package to expand. Can be a string or a PackageIdentifier object.
-   * @returns - A promise that resolves to an array of PackageIdentifier objects representing the expanded packages.
+   * @param pkg - The package to expand. Can be a string or a FhirPackageIdentifier object.
+   * @returns - A promise that resolves to an array of FhirPackageIdentifier objects representing the expanded packages.
    */
-  public async expandPackageDependencies(pkg: string | PackageIdentifier): Promise<PackageIdentifier[]> {
+  public async expandPackageDependencies(pkg: string | FhirPackageIdentifier): Promise<FhirPackageIdentifier[]> {
     try {
       const pkgObj = typeof pkg === 'string' ? await this.fpi.toPackageObject(pkg) : pkg;
       const expanded: string[] = Array.from(await this._collectDependencies(pkgObj));
@@ -210,10 +210,10 @@ export class FhirPackageExplorer {
    * Get the manifest (package.json) for a given FHIR package.
    * Returns the parsed manifest object for the specified package, or throws if not found.
    *
-   * @param pkg - The package to fetch the manifest for (string or PackageIdentifier).
+   * @param pkg - The package to fetch the manifest for (string or FhirPackageIdentifier).
    * @returns A promise that resolves to the manifest (package.json) object for the package.
    */
-  public async getPackageManifest(pkg: string | PackageIdentifier): Promise<any> {
+  public async getPackageManifest(pkg: string | FhirPackageIdentifier): Promise<any> {
     try {
       const meta = await this.fpi.getManifest(pkg);
       if (!meta) throw new Error(`Failed to fetch manifest (package.json) for package: ${String(pkg)}`);
@@ -223,9 +223,9 @@ export class FhirPackageExplorer {
     }
   }
 
-  private async _loadContext(context: Array<string | PackageIdentifier>) {
+  private async _loadContext(context: Array<string | FhirPackageIdentifier>) {
     // Resolve provided context entries into root packages (dedup first)
-    const rootMap = new Map<string, PackageIdentifier>();
+    const rootMap = new Map<string, FhirPackageIdentifier>();
     for (const entry of context) {
       const pkg = await this.fpi.toPackageObject(entry);
       rootMap.set(`${pkg.id}#${pkg.version}`, pkg);
@@ -234,7 +234,7 @@ export class FhirPackageExplorer {
 
     // For each root, compute its full transitive dependency closure (including itself)
     const rootClosures = new Map<string, Set<string>>();
-    const keyToPkg = new Map<string, PackageIdentifier>();
+    const keyToPkg = new Map<string, FhirPackageIdentifier>();
     for (const root of initialRoots) {
       await this.fpi.install(root); // ensure root is installed before dependency walk
       const closure = await this._collectDependencies(root); // Set of id#version (includes root)
@@ -267,7 +267,7 @@ export class FhirPackageExplorer {
     }
 
     // Build final full context package set = union of closures of minimal roots
-    const finalContextMap = new Map<string, PackageIdentifier>();
+    const finalContextMap = new Map<string, FhirPackageIdentifier>();
     for (const mr of minimalRoots) {
       const closure = rootClosures.get(`${mr.id}#${mr.version}`)!;
       for (const key of closure) {
@@ -286,9 +286,9 @@ export class FhirPackageExplorer {
     this.contextPackages = sortPackages(Array.from(finalContextMap.values()));
   }
 
-  private async _collectDependencies(pkg: PackageIdentifier): Promise<Set<string>> {
+  private async _collectDependencies(pkg: FhirPackageIdentifier): Promise<Set<string>> {
     const visited = new Set<string>();
-    const visit = async (p: PackageIdentifier) => {
+    const visit = async (p: FhirPackageIdentifier) => {
       const key = `${p.id}#${p.version}`;
       if (visited.has(key)) return;
       visited.add(key);
@@ -321,17 +321,15 @@ export class FhirPackageExplorer {
    * Returns only the root packages that are not dependencies of other root packages,
    * effectively removing redundant entries from the originally provided context.
    *
-   * @returns An array of PackageIdentifier objects representing the minimal root packages.
+   * @returns An array of FhirPackageIdentifier objects representing the minimal root packages.
    */
-  public getNormalizedRootPackages(): PackageIdentifier[] {
+  public getNormalizedRootPackages(): FhirPackageIdentifier[] {
     return this.normalizedRootPackages;
   }
 }
 
 export type {
-  PackageIdentifier,
   FileInPackageIndex,
-  ILogger,
   FileIndexEntryWithPkg,
   ExplorerConfig,
   LookupFilter 

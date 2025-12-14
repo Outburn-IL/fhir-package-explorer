@@ -1,5 +1,5 @@
 import { FileInPackageIndex } from 'fhir-package-installer';
-import type { Logger as ILogger, FhirPackageIdentifier as PackageIdentifier  } from '@outburn/types';
+import type { Logger, FhirPackageIdentifier } from '@outburn/types';
 
 export interface FileIndexEntryWithPkg extends FileInPackageIndex {
   __packageId: string;
@@ -7,14 +7,14 @@ export interface FileIndexEntryWithPkg extends FileInPackageIndex {
 }
 
 export interface ExplorerConfig {
-  logger?: ILogger;
+  logger?: Logger;
   registryUrl?: string;
   registryToken?: string;
   cachePath?: string;
-  context: Array<string | PackageIdentifier>;
+  context: Array<string | FhirPackageIdentifier>;
   skipExamples?: boolean;
 }
 
 export interface LookupFilter extends Partial<FileInPackageIndex> {
-  package?: string | PackageIdentifier;
+  package?: string | FhirPackageIdentifier;
 }
