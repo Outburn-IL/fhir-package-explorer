@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { FhirPackageExplorer } from 'fhir-package-explorer';
 import path from 'path';
+import { FhirVersion } from '@outburn/types';
 
 describe('FhirPackageExplorer', () => {
 
@@ -651,3 +652,46 @@ describe('FhirPackageExplorer canonical minimal root normalization', () => {
     ]);
   });
 });
+
+describe('FhirPackageExplorer auto-core-package feature', () => {
+  const customCachePath = path.join('test', '.test-cache');
+
+  it('should NOT auto-add core package when one already exists', async () => {
+    const explorer = await FhirPackageExplorer.create({
+      context: ['hl7.fhir.uv.sdc@3.0.0'], // This has hl7.fhir.r4.core as dependency
+      fhirVersion: '5.0.0', // Even if we specify R5, shouldn't add it
+      cachePath: customCachePath,
+      skipExamples: true
+    });
+
+    const contextPackages = explorer.getContextPackages();
+    const corePackages = contextPackages.filter(pkg => pkg.id.match(/^hl7\.fhir\.r\d+b?\.core$/));
+    
+    // Should only have R4 core (from sdc dependency), not R5
+    expect(corePackages.length).toBe(1);
+    expect(corePackages[0].id).toBe('hl7.fhir.r4.core');
+    expect(corePackages[0].version).toBe('4.0.1');
+  });
+
+  it('should support version strings and release names', async () => {
+    // Test that both version numbers and release names work
+    const testCases = [
+      { input: '3.0.2', expected: { id: 'hl7.fhir.r3.core', version: '3.0.2' } },
+      { input: '3.0', expected: { id: 'hl7.fhir.r3.core', version: '3.0.2' } },
+      { input: 'R3', expected: { id: 'hl7.fhir.r3.core', version: '3.0.2' } },
+      { input: 'STU3', expected: { id: 'hl7.fhir.r3.core', version: '3.0.2' } },
+      { input: '4.0.1', expected: { id: 'hl7.fhir.r4.core', version: '4.0.1' } },
+      { input: '4.0', expected: { id: 'hl7.fhir.r4.core', version: '4.0.1' } },
+      { input: '4.3.0', expected: { id: 'hl7.fhir.r4b.core', version: '4.3.0' } },
+      { input: '4.3', expected: { id: 'hl7.fhir.r4b.core', version: '4.3.0' } },
+      { input: '5.0.0', expected: { id: 'hl7.fhir.r5.core', version: '5.0.0' } },
+      { input: '5.0', expected: { id: 'hl7.fhir.r5.core', version: '5.0.0' } }
+    ];
+
+    for (const testCase of testCases) {
+      const { resolveFhirVersionToCorePackage } = await import('../src/utils');
+      const result = resolveFhirVersionToCorePackage(testCase.input as FhirVersion);
+      expect(result).toEqual(testCase.expected);
+    }
+  });
+}, 480000); // 8 minutes timeout

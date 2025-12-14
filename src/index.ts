@@ -7,7 +7,7 @@ import path from 'path';
 import type { FhirPackageIdentifier, Logger } from '@outburn/types';
 
 import { FileIndexEntryWithPkg, ExplorerConfig, LookupFilter } from './types';
-import { getAllFastIndexKeys, loadJson, matchesFilter, normalizePipedFilter, prethrow, sortPackages, tryResolveDuplicates } from './utils';
+import { getAllFastIndexKeys, loadJson, matchesFilter, normalizePipedFilter, prethrow, sortPackages, tryResolveDuplicates, resolveFhirVersionToCorePackage } from './utils';
 
 export class FhirPackageExplorer {
   private fpi: FhirPackageInstaller;
@@ -24,7 +24,36 @@ export class FhirPackageExplorer {
   static async create(config: ExplorerConfig): Promise<FhirPackageExplorer> {
     const instance = new FhirPackageExplorer(config);
     try {
-      await instance._loadContext(config.context);
+      // Determine the effective context - potentially adding a core package if needed
+      let effectiveContext = config.context;
+      
+      // If fhirVersion is specified, check if we need to auto-add a core package
+      if (config.fhirVersion) {
+        // First, load the initial context to check what's there
+        await instance._loadContext(config.context);
+        
+        // Check if any FHIR core package is in the context
+        const hasCorePackage = instance.contextPackages.some(pkg => 
+          pkg.id.match(/^hl7\.fhir\.r[0-9]+b?\.core$/)
+        );
+        
+        if (!hasCorePackage) {
+          // No core package found - add one based on fhirVersion
+          const corePackage = resolveFhirVersionToCorePackage(config.fhirVersion);
+          
+          instance.logger.warn?.(
+            `No FHIR core package found in context. Auto-adding: ${corePackage.id}@${corePackage.version}`
+          );
+          
+          // Reload context with the core package added
+          effectiveContext = [...config.context, corePackage];
+          await instance._loadContext(effectiveContext);
+        }
+      } else {
+        // Just load the context as-is
+        await instance._loadContext(effectiveContext);
+      }
+      
       return instance;
     } catch (error) {
       instance.logger.error('Error loading context packages');

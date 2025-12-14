@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { FhirPackageInstaller } from 'fhir-package-installer';
-import type { FhirPackageIdentifier } from '@outburn/types';
+import type { FhirPackageIdentifier, FhirRelease, FhirVersion } from '@outburn/types';
 import { FileIndexEntryWithPkg, LookupFilter } from './types';
 import fs from 'fs-extra';
 
@@ -189,6 +189,57 @@ export const tryResolveDuplicates = async (matches: FileIndexEntryWithPkg[], fil
 
 export const loadJson = async (filePath: string): Promise<any> => {
   return await fs.readJson(filePath);
+};
+
+/**
+ * Map of FHIR version strings to their canonical release identifiers
+ */
+const fhirVersionMap: Record<FhirVersion, FhirRelease> = {
+  '3.0.2': 'STU3',
+  '3.0': 'STU3',
+  'R3': 'STU3',
+  'STU3': 'STU3',
+  '4.0.1': 'R4',
+  '4.0': 'R4',
+  'R4': 'R4',
+  '4.3.0': 'R4B',
+  '4.3': 'R4B',
+  'R4B': 'R4B',
+  '5.0.0': 'R5',
+  '5.0': 'R5',
+  'R5': 'R5'
+};
+
+/**
+ * Map of FHIR release identifiers to their core package identifiers
+ */
+const fhirCorePackages: Record<FhirRelease, FhirPackageIdentifier> = {
+  'STU3': { id: 'hl7.fhir.r3.core', version: '3.0.2' },
+  'R3': { id: 'hl7.fhir.r3.core', version: '3.0.2' },
+  'R4': { id: 'hl7.fhir.r4.core', version: '4.0.1' },
+  'R4B': { id: 'hl7.fhir.r4b.core', version: '4.3.0' },
+  'R5': { id: 'hl7.fhir.r5.core', version: '5.0.0' }
+};
+
+/**
+ * Maps a FHIR version string to the appropriate core package identifier.
+ * Supports versions: STU3/R3 (3.0.2), R4 (4.0.1), R4B (4.3.0), R5 (5.0.0)
+ * 
+ * @param fhirVersion - The FHIR version string (e.g., '4.0.1', '5.0.0', 'R4', 'STU3')
+ * @returns The FhirPackageIdentifier for the corresponding core package
+ * @throws Error if the FHIR version is not supported
+ */
+export const resolveFhirVersionToCorePackage = (fhirVersion: FhirVersion): FhirPackageIdentifier => {
+   
+  // Look up the canonical release identifier
+  const fhirRelease: FhirRelease = fhirVersionMap[fhirVersion];
+  
+  if (!fhirRelease) {
+    const supportedVersions = Object.keys(fhirVersionMap).join(', ');
+    throw new Error(`Unsupported FHIR version: ${fhirVersion}. Supported versions: ${supportedVersions}`);
+  }
+  
+  return fhirCorePackages[fhirRelease];
 };
 
 /**
