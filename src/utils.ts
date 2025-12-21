@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { FhirPackageInstaller } from 'fhir-package-installer';
-import type { FhirPackageIdentifier, FhirRelease, FhirVersion } from '@outburn/types';
-import { FileIndexEntryWithPkg, LookupFilter } from './types';
+import type { FhirPackageIdentifier, FhirRelease, FhirVersion, FileIndexEntryWithPkg } from '@outburn/types';
+import { LookupFilter } from './types';
 import fs from 'fs-extra';
 
 /**

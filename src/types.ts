@@ -1,12 +1,7 @@
-import { FileInPackageIndex } from 'fhir-package-installer';
-import type { Logger, FhirPackageIdentifier, FhirVersion } from '@outburn/types';
-
-export interface FileIndexEntryWithPkg extends FileInPackageIndex {
-  __packageId: string;
-  __packageVersion?: string;
-}
+import type { Logger, FhirPackageIdentifier, FhirVersion, FileInPackageIndex } from '@outburn/types';
 
 export interface ExplorerConfig {
+
   logger?: Logger;
   registryUrl?: string;
   registryToken?: string;

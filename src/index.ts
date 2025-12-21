@@ -1,12 +1,13 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import {
-  FhirPackageInstaller,
-  FileInPackageIndex
+  FhirPackageInstaller
 } from 'fhir-package-installer';
 import path from 'path';
-import type { FhirPackageIdentifier, Logger } from '@outburn/types';
+import type { FhirPackageIdentifier, Logger, FileInPackageIndex, FileIndexEntryWithPkg } from '@outburn/types';
 
-import { FileIndexEntryWithPkg, ExplorerConfig, LookupFilter } from './types';
+
+import { ExplorerConfig, LookupFilter } from './types';
+
 import { getAllFastIndexKeys, loadJson, matchesFilter, normalizePipedFilter, prethrow, sortPackages, tryResolveDuplicates, resolveFhirVersionToCorePackage } from './utils';
 
 export class FhirPackageExplorer {
