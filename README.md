@@ -52,9 +52,14 @@ const resolved = await explorer.resolve({
 
 Factory method that installs context packages (and their dependencies) before returning a ready-to-use instance.
 
-- `context` — **required**. Array of FHIR packages (strings or `{ id, version }`). Dependecies are automatically loaded.
-- `logger` — optional. Custom logger implementing `ILogger`.
+- `context` — **required**. Array of FHIR packages (strings or `{ id, version }`). Dependencies are automatically loaded.
+- `fhirVersion` — optional. FHIR version to use when auto-adding a core package if none is found in context. Can be specified as a version number (e.g., `'4.0.1'`, `'5.0.0'`) or release name (e.g., `'R4'`, `'STU3'`). Supported: `'3.0.2'`, `'3.0'`, `'R3'` (STU3), `'4.0.1'`, `'4.0'` (R4), `'4.3.0'`, `'4.3'` (R4B), `'5.0.0'`, `'5.0'` (R5). When specified and no core package exists in the resolved context, automatically adds the appropriate `hl7.fhir.rX.core` package.
+- `logger` — optional. Custom logger implementing `Logger`.
 - `registryUrl`, `registryToken`, `cachePath`, `skipExamples` — optional. Passed through to [`fhir-package-installer`](https://www.npmjs.com/package/fhir-package-installer).
+
+**Auto Core Package Feature:**
+
+When `fhirVersion` is specified, FhirPackageExplorer checks if a FHIR core package exists in the context. If your context contains only implementation guides or profiles without a core package, it will automatically add the appropriate `hl7.fhir.rX.core` package. This prevents the need to manually manage core package dependencies in downstream projects.
 
 ---
 
@@ -94,7 +99,7 @@ Same as `resolve`, but returns metadata only. Uses the same duplicate resolution
 
 ---
 
-### `getLogger(): ILogger`
+### `getLogger(): Logger`
 
 Returns the internal logger used by this instance.
 

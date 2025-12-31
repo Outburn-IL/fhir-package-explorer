@@ -1,14 +1,15 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { FhirPackageInstaller, PackageIdentifier } from 'fhir-package-installer';
-import { FileIndexEntryWithPkg, LookupFilter } from './types';
+import { FhirPackageInstaller } from 'fhir-package-installer';
+import type { FhirPackageIdentifier, FhirRelease, FhirVersion, FileIndexEntryWithPkg } from '@outburn/types';
+import { LookupFilter } from './types';
 import fs from 'fs-extra';
 
 /**
- * Sorts an array of PackageIdentifier objects by their id and version.
- * @param arr - The array of PackageIdentifier objects to sort.
+ * Sorts an array of FhirPackageIdentifier objects by their id and version.
+ * @param arr - The array of FhirPackageIdentifier objects to sort.
  * @returns 
  */
-export const sortPackages = (arr: PackageIdentifier[]): PackageIdentifier[] => {
+export const sortPackages = (arr: FhirPackageIdentifier[]): FhirPackageIdentifier[] => {
   return arr.slice().sort((a, b) => {
     const aKey = `${a.id}@${a.version}`;
     const bKey = `${b.id}@${b.version}`;
@@ -94,12 +95,20 @@ export const tryResolveDuplicates = async (matches: FileIndexEntryWithPkg[], fil
   const isImplicitPackage = (packageId: string): boolean => isTerminologyPackage(packageId) || isExtensionsPackage(packageId);
   const isTerminologyResource = (resourceType: string): boolean => ['ValueSet', 'ConceptMap', 'CodeSystem'].includes(resourceType);
 
-  const extractFhirVersion = (packageId: string): number => {
+  /**
+   * Extracts the FHIR version (e.g. 4 from r4) from an implicit package ID.
+   * This is only safe to call on packages validated by isImplicitPackage.
+   */
+  const extractFhirVersionFromImplicitPackageId = (packageId: string): number => {
     const match = packageId.match(/\.r(\d+)$/);
     return match ? parseInt(match[1], 10) : 0;
   };
 
-  const compareSemver = (a: string, b: string): number => {
+  const compareSemver = (a: string | undefined, b: string | undefined): number => {
+    if (!a && !b) return 0;
+    if (!a) return -1;
+    if (!b) return 1;
+
     const parse = (v: string) => {
       const [core] = v.split('-');
       const [major, minor, patch] = core.split('.').map(Number);
@@ -154,7 +163,7 @@ export const tryResolveDuplicates = async (matches: FileIndexEntryWithPkg[], fil
       if (versionComparison !== 0) return versionComparison;
       
       // If package versions are equal, compare FHIR versions
-      return extractFhirVersion(b.__packageId) - extractFhirVersion(a.__packageId);
+      return extractFhirVersionFromImplicitPackageId(b.__packageId) - extractFhirVersionFromImplicitPackageId(a.__packageId);
     });
     
     // Return the best match (highest package version, then highest FHIR version)
@@ -180,6 +189,57 @@ export const tryResolveDuplicates = async (matches: FileIndexEntryWithPkg[], fil
 
 export const loadJson = async (filePath: string): Promise<any> => {
   return await fs.readJson(filePath);
+};
+
+/**
+ * Map of FHIR version strings to their canonical release identifiers
+ */
+const fhirVersionMap: Record<FhirVersion, FhirRelease> = {
+  '3.0.2': 'STU3',
+  '3.0': 'STU3',
+  'R3': 'STU3',
+  'STU3': 'STU3',
+  '4.0.1': 'R4',
+  '4.0': 'R4',
+  'R4': 'R4',
+  '4.3.0': 'R4B',
+  '4.3': 'R4B',
+  'R4B': 'R4B',
+  '5.0.0': 'R5',
+  '5.0': 'R5',
+  'R5': 'R5'
+};
+
+/**
+ * Map of FHIR release identifiers to their core package identifiers
+ */
+const fhirCorePackages: Record<FhirRelease, FhirPackageIdentifier> = {
+  'STU3': { id: 'hl7.fhir.r3.core', version: '3.0.2' },
+  'R3': { id: 'hl7.fhir.r3.core', version: '3.0.2' },
+  'R4': { id: 'hl7.fhir.r4.core', version: '4.0.1' },
+  'R4B': { id: 'hl7.fhir.r4b.core', version: '4.3.0' },
+  'R5': { id: 'hl7.fhir.r5.core', version: '5.0.0' }
+};
+
+/**
+ * Maps a FHIR version string to the appropriate core package identifier.
+ * Supports versions: STU3/R3 (3.0.2), R4 (4.0.1), R4B (4.3.0), R5 (5.0.0)
+ * 
+ * @param fhirVersion - The FHIR version string (e.g., '4.0.1', '5.0.0', 'R4', 'STU3')
+ * @returns The FhirPackageIdentifier for the corresponding core package
+ * @throws Error if the FHIR version is not supported
+ */
+export const resolveFhirVersionToCorePackage = (fhirVersion: FhirVersion): FhirPackageIdentifier => {
+   
+  // Look up the canonical release identifier
+  const fhirRelease: FhirRelease = fhirVersionMap[fhirVersion];
+  
+  if (!fhirRelease) {
+    const supportedVersions = Object.keys(fhirVersionMap).join(', ');
+    throw new Error(`Unsupported FHIR version: ${fhirVersion}. Supported versions: ${supportedVersions}`);
+  }
+  
+  return fhirCorePackages[fhirRelease];
 };
 
 /**
