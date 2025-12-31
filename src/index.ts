@@ -35,7 +35,7 @@ export class FhirPackageExplorer {
         
         // Check if any FHIR core package is in the context
         const hasCorePackage = instance.contextPackages.some(pkg => 
-          pkg.id.match(/^hl7\.fhir\.r[0-9]+b?\.core$/)
+          pkg.id.match(/^hl7\.fhir\.r\d+b?\.core$/)
         );
         
         if (!hasCorePackage) {
