@@ -688,8 +688,8 @@ describe('FhirPackageExplorer auto-core-package feature', () => {
       { input: '5.0', expected: { id: 'hl7.fhir.r5.core', version: '5.0.0' } }
     ];
 
+    const { resolveFhirVersionToCorePackage } = await import('../src/utils');
     for (const testCase of testCases) {
-      const { resolveFhirVersionToCorePackage } = await import('../src/utils');
       const result = resolveFhirVersionToCorePackage(testCase.input as FhirVersion);
       expect(result).toEqual(testCase.expected);
     }
