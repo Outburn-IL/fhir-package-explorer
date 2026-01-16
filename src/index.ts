@@ -8,7 +8,7 @@ import type { FhirPackageIdentifier, Logger, FileInPackageIndex, FileIndexEntryW
 
 import { ExplorerConfig, LookupFilter } from './types';
 
-import { getAllFastIndexKeys, loadJson, matchesFilter, normalizePipedFilter, prethrow, sortPackages, tryResolveDuplicates, resolveFhirVersionToCorePackage } from './utils';
+import { getAllFastIndexKeys, loadJson, matchesFilter, normalizePipedFilter, sortPackages, tryResolveDuplicates, resolveFhirVersionToCorePackage } from './utils';
 
 export class FhirPackageExplorer {
   private fpi: FhirPackageInstaller;
@@ -20,59 +20,50 @@ export class FhirPackageExplorer {
   private contextPackages: FhirPackageIdentifier[] = [];
   private normalizedRootPackages: FhirPackageIdentifier[] = [];
   private skipExamples: boolean = false;
-  private prethrow: (msg: Error | any) => Error = prethrow;
 
   static async create(config: ExplorerConfig): Promise<FhirPackageExplorer> {
     const instance = new FhirPackageExplorer(config);
-    try {
-      // Determine the effective context - potentially adding a core package if needed
-      let effectiveContext = config.context;
+    // Determine the effective context - potentially adding a core package if needed
+    let effectiveContext = config.context;
       
-      // If fhirVersion is specified, check if we need to auto-add a core package
-      if (config.fhirVersion) {
-        // First, load the initial context to check what's there
-        await instance._loadContext(config.context);
+    // If fhirVersion is specified, check if we need to auto-add a core package
+    if (config.fhirVersion) {
+      // First, load the initial context to check what's there
+      await instance._loadContext(config.context);
         
-        // Check if any FHIR core package is in the context
-        const hasCorePackage = instance.contextPackages.some(pkg => 
-          pkg.id.match(/^hl7\.fhir\.r\d+b?\.core$/)
+      // Check if any FHIR core package is in the context
+      const hasCorePackage = instance.contextPackages.some(pkg => 
+        pkg.id.match(/^hl7\.fhir\.r\d+b?\.core$/)
+      );
+        
+      if (!hasCorePackage) {
+        // No core package found - add one based on fhirVersion
+        const corePackage = resolveFhirVersionToCorePackage(config.fhirVersion);
+          
+        instance.logger.warn?.(
+          `No FHIR core package found in context. Auto-adding: ${corePackage.id}@${corePackage.version}`
         );
-        
-        if (!hasCorePackage) {
-          // No core package found - add one based on fhirVersion
-          const corePackage = resolveFhirVersionToCorePackage(config.fhirVersion);
           
-          instance.logger.warn?.(
-            `No FHIR core package found in context. Auto-adding: ${corePackage.id}@${corePackage.version}`
-          );
-          
-          // Reload context with the core package added
-          effectiveContext = [...config.context, corePackage];
-          await instance._loadContext(effectiveContext);
-        }
-      } else {
-        // Just load the context as-is
+        // Reload context with the core package added
+        effectiveContext = [...config.context, corePackage];
         await instance._loadContext(effectiveContext);
       }
-      
-      return instance;
-    } catch (error) {
-      instance.logger.error('Error loading context packages');
-      throw instance.prethrow(error);
+    } else {
+      // Just load the context as-is
+      await instance._loadContext(effectiveContext);
     }
+      
+    return instance;
   }
 
   private constructor(config: ExplorerConfig) {
     const { logger, registryUrl, registryToken, cachePath, skipExamples } = config || {} as ExplorerConfig;
     this.fpi = new FhirPackageInstaller({ logger, registryUrl, registryToken, cachePath, skipExamples });
-    this.logger = this.fpi.getLogger();
-    if (this.logger) this.prethrow = (msg: Error | any) => {
-      if (!(msg instanceof Error)) {
-        msg = new Error(msg);
-      }
-      this.logger.error(msg.message);
-      this.logger.error(JSON.stringify(msg, null, 2));
-      return msg;
+    this.logger = logger || {
+      debug: () => {},
+      info: () => {},
+      warn: () => {},
+      error: () => {}
     };
     this.cachePath = this.fpi.getCachePath();
     if (skipExamples) this.skipExamples = skipExamples;
@@ -96,14 +87,9 @@ export class FhirPackageExplorer {
    * @returns - A promise that resolves to an array of FhirPackageIdentifier objects.
    */
   public async getDirectDependencies(pkg: string | FhirPackageIdentifier): Promise<FhirPackageIdentifier[]> {
-    try {
-      const pkgObj = typeof pkg === 'string' ? await this.fpi.toPackageObject(pkg) : pkg;
-      const dependencies = await this.fpi.getDependencies(pkgObj);
-      return Object.entries(dependencies).map(([id, version]) => ({ id, version }));
-    } catch (error) {
-      this.logger.error(`Error reading package dependencies for ${String(pkg)}`);
-      throw this.prethrow(error);
-    }
+    const pkgObj = typeof pkg === 'string' ? await this.fpi.toPackageObject(pkg) : pkg;
+    const dependencies = await this.fpi.getDependencies(pkgObj);
+    return Object.entries(dependencies).map(([id, version]) => ({ id, version }));
   }
   
   /**
@@ -112,128 +98,105 @@ export class FhirPackageExplorer {
    * @returns - A promise that resolves to an array of FhirPackageIdentifier objects representing the expanded packages.
    */
   public async expandPackageDependencies(pkg: string | FhirPackageIdentifier): Promise<FhirPackageIdentifier[]> {
-    try {
-      const pkgObj = typeof pkg === 'string' ? await this.fpi.toPackageObject(pkg) : pkg;
-      const expanded: string[] = Array.from(await this._collectDependencies(pkgObj));
-      return sortPackages(await Promise.all(expanded.map(async (p) => await this.fpi.toPackageObject(p))));
-    } catch (error) {
-      this.logger.error(`Error expanding package dependencies for ${String(pkg)}`);
-      throw this.prethrow(error);
-    }
+    const pkgObj = typeof pkg === 'string' ? await this.fpi.toPackageObject(pkg) : pkg;
+    const expanded: string[] = Array.from(await this._collectDependencies(pkgObj));
+    return sortPackages(await Promise.all(expanded.map(async (p) => await this.fpi.toPackageObject(p))));
   }
 
   public async lookup(filter: LookupFilter = {}): Promise<any[]> {
-    try {
-      const meta = await this.lookupMeta(filter);
-      const results = await Promise.all(meta.map(async (entry) => {
-        const filePath = await this._getFilePath(entry);
-        if (this.contentCache.has(filePath)) return this.contentCache.get(filePath);
-        const content = await loadJson(filePath);
-        const enriched = {
-          __packageId: entry.__packageId,
-          __packageVersion: entry.__packageVersion,
-          __filename: entry.filename,
-          ...content
-        };
-        this.contentCache.set(filePath, enriched);
-        return enriched;
-      }));
-      return results;
-    } catch (error) {
-      this.logger.error(`Error looking up resources with filter: ${JSON.stringify(filter)}`);
-      throw this.prethrow(error);
-    }
+    const meta = await this.lookupMeta(filter);
+    const results = await Promise.all(meta.map(async (entry) => {
+      const filePath = await this._getFilePath(entry);
+      if (this.contentCache.has(filePath)) return this.contentCache.get(filePath);
+      const content = await loadJson(filePath);
+      const enriched = {
+        __packageId: entry.__packageId,
+        __packageVersion: entry.__packageVersion,
+        __filename: entry.filename,
+        ...content
+      };
+      this.contentCache.set(filePath, enriched);
+      return enriched;
+    }));
+    return results;
   }
 
   public async lookupMeta(filter: LookupFilter = {}): Promise<FileIndexEntryWithPkg[]> {
-    try {
-      const normalizedFilter = normalizePipedFilter(filter);
-      const pkgIdentifiers = this.contextPackages;
+    const normalizedFilter = normalizePipedFilter(filter);
+    const pkgIdentifiers = this.contextPackages;
   
-      let allowedPackages: Set<string> | undefined = undefined;
-      if (normalizedFilter.package) {
-        const scopedPackage = await this.fpi.toPackageObject(normalizedFilter.package);
-        allowedPackages = await this._collectDependencies(scopedPackage);
-      }
-  
-      const resultMap = new Map<string, FileIndexEntryWithPkg>();
-  
-      for (const pkg of pkgIdentifiers) {
-        const pkgKey = `${pkg.id}#${pkg.version}`;
-        if (allowedPackages && !allowedPackages.has(pkgKey)) continue;
-  
-        let index = this.indexCache.get(pkgKey);
-        if (!index) {
-          await this.fpi.install(pkg);
-          const rawPkgIndex = await this.fpi.getPackageIndexFile(pkg);
-          const rawIndex = rawPkgIndex.files ?? [];
-          const newIndex = rawIndex.map((file: FileInPackageIndex) => ({
-            ...file,
-            __packageId: pkg.id,
-            __packageVersion: pkg.version
-          }));
-          this.indexCache.set(pkgKey, newIndex);
-          this._buildFastIndex(newIndex);
-          index = newIndex;
-        }
-  
-        const fastKeys = getAllFastIndexKeys(normalizedFilter as FileIndexEntryWithPkg);
-        const fastCandidates = fastKeys.flatMap(k => this.fastIndex.get(k) ?? []);
-  
-        const candidates = fastCandidates.length > 0 ? fastCandidates : index;
-  
-        for (const entry of candidates) {
-          const entryPkgKey = `${entry.__packageId}#${entry.__packageVersion}`;
-          if (allowedPackages && !allowedPackages.has(entryPkgKey)) continue;
-          if (!matchesFilter(entry, normalizedFilter)) continue;
-          const compositeKey = `${entry.filename}|${entry.__packageId}|${entry.__packageVersion}`;
-          if (!resultMap.has(compositeKey)) {
-            resultMap.set(compositeKey, entry);
-          }
-        }
-      }
-  
-      return Array.from(resultMap.values());
-    } catch (error) {
-      this.logger.error(`Error looking up metadata with filter: ${JSON.stringify(filter)}`);
-      throw this.prethrow(error);
+    let allowedPackages: Set<string> | undefined = undefined;
+    if (normalizedFilter.package) {
+      const scopedPackage = await this.fpi.toPackageObject(normalizedFilter.package);
+      allowedPackages = await this._collectDependencies(scopedPackage);
     }
+  
+    const resultMap = new Map<string, FileIndexEntryWithPkg>();
+  
+    for (const pkg of pkgIdentifiers) {
+      const pkgKey = `${pkg.id}#${pkg.version}`;
+      if (allowedPackages && !allowedPackages.has(pkgKey)) continue;
+  
+      let index = this.indexCache.get(pkgKey);
+      if (!index) {
+        await this.fpi.install(pkg);
+        const rawPkgIndex = await this.fpi.getPackageIndexFile(pkg);
+        const rawIndex = rawPkgIndex.files ?? [];
+        const newIndex = rawIndex.map((file: FileInPackageIndex) => ({
+          ...file,
+          __packageId: pkg.id,
+          __packageVersion: pkg.version
+        }));
+        this.indexCache.set(pkgKey, newIndex);
+        this._buildFastIndex(newIndex);
+        index = newIndex;
+      }
+  
+      const fastKeys = getAllFastIndexKeys(normalizedFilter as FileIndexEntryWithPkg);
+      const fastCandidates = fastKeys.flatMap(k => this.fastIndex.get(k) ?? []);
+  
+      const candidates = fastCandidates.length > 0 ? fastCandidates : index;
+  
+      for (const entry of candidates) {
+        const entryPkgKey = `${entry.__packageId}#${entry.__packageVersion}`;
+        if (allowedPackages && !allowedPackages.has(entryPkgKey)) continue;
+        if (!matchesFilter(entry, normalizedFilter)) continue;
+        const compositeKey = `${entry.filename}|${entry.__packageId}|${entry.__packageVersion}`;
+        if (!resultMap.has(compositeKey)) {
+          resultMap.set(compositeKey, entry);
+        }
+      }
+    }
+  
+    return Array.from(resultMap.values());
   }
 
   public async resolve(filter: LookupFilter = {}): Promise<any> {
-    try {
-      const matches = await this.lookup(filter);
-      if (matches.length === 0) throw new Error(`No matching resource found with filter: ${JSON.stringify(filter)}`);
-      if (matches.length > 1) {
-        const candidates = await tryResolveDuplicates(matches, filter, this.fpi);
-        if (candidates.length !== 1) {
-          const matchInfo = matches.map(m => `${m.__packageId}@${m.__packageVersion}`).join(', ');
-          throw new Error(`Multiple matching resources found with filter: ${JSON.stringify(filter)}. Found in packages: ${matchInfo}`);
-        }
-        return candidates[0];
+    const matches = await this.lookup(filter);
+    if (matches.length === 0) throw new Error(`No matching resource found with filter: ${JSON.stringify(filter)}`);
+    if (matches.length > 1) {
+      const candidates = await tryResolveDuplicates(matches, filter, this.fpi);
+      if (candidates.length !== 1) {
+        const matchInfo = matches.map(m => `${m.__packageId}@${m.__packageVersion}`).join(', ');
+        throw new Error(`Multiple matching resources found with filter: ${JSON.stringify(filter)}. Found in packages: ${matchInfo}`);
       }
-      return matches[0];
-    } catch (error) {
-      throw this.prethrow(`Error resolving resource with filter: ${JSON.stringify(filter)}. Error: ${error instanceof Error ? error.message : String(error)}`);
+      return candidates[0];
     }
+    return matches[0];
   }
 
   public async resolveMeta(filter: LookupFilter = {}): Promise<FileIndexEntryWithPkg> {
-    try {
-      const matches = await this.lookupMeta(filter);
-      if (matches.length === 0) throw new Error(`No matching resource found with filter: ${JSON.stringify(filter)}`);
-      if (matches.length > 1) {
-        const candidates = await tryResolveDuplicates(matches, filter, this.fpi);
-        if (candidates.length !== 1) {
-          const matchInfo = matches.map(m => `${m.__packageId}@${m.__packageVersion}`).join(', ');
-          throw new Error(`Multiple matching resources found with filter: ${JSON.stringify(filter)}. Found in packages: ${matchInfo}`);
-        }
-        return candidates[0];
+    const matches = await this.lookupMeta(filter);
+    if (matches.length === 0) throw new Error(`No matching resource found with filter: ${JSON.stringify(filter)}`);
+    if (matches.length > 1) {
+      const candidates = await tryResolveDuplicates(matches, filter, this.fpi);
+      if (candidates.length !== 1) {
+        const matchInfo = matches.map(m => `${m.__packageId}@${m.__packageVersion}`).join(', ');
+        throw new Error(`Multiple matching resources found with filter: ${JSON.stringify(filter)}. Found in packages: ${matchInfo}`);
       }
-      return matches[0];
-    } catch (error) {
-      throw this.prethrow(`Error resolving metadata with filter: ${JSON.stringify(filter)}. Error: ${error instanceof Error ? error.message : String(error)}`);
+      return candidates[0];
     }
+    return matches[0];
   }
 
   /**
@@ -244,13 +207,9 @@ export class FhirPackageExplorer {
    * @returns A promise that resolves to the manifest (package.json) object for the package.
    */
   public async getPackageManifest(pkg: string | FhirPackageIdentifier): Promise<any> {
-    try {
-      const meta = await this.fpi.getManifest(pkg);
-      if (!meta) throw new Error(`Failed to fetch manifest (package.json) for package: ${String(pkg)}`);
-      return meta;
-    } catch (error) {
-      throw this.prethrow(error);
-    }
+    const meta = await this.fpi.getManifest(pkg);
+    if (!meta) throw new Error(`Failed to fetch manifest (package.json) for package: ${String(pkg)}`);
+    return meta;
   }
 
   private async _loadContext(context: Array<string | FhirPackageIdentifier>) {
