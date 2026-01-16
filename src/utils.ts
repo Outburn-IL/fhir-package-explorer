@@ -54,17 +54,6 @@ export const matchesFilter = (entry: FileIndexEntryWithPkg, filter: LookupFilter
 };
 
 /**
- * Default prethrow function does nothing since the regular throw prints to console.log, which is the default logger
- */
-export const prethrow = (msg: Error | any): Error => {
-  if (msg instanceof Error) {
-    return msg;
-  }
-  const error = new Error(msg);
-  return error;
-};
-
-/**
  * When multiple matches are found, this function tries to resolve the duplicates using a prioritized strategy.
  * 
  * Resolution strategies (in order of priority):
