@@ -50,7 +50,8 @@
   },
   "dependencies": {
     "fhir-package-installer": "^1.10.0",
-    "fs-extra": "^11.3.3"
+    "fs-extra": "^11.3.3",
+    "lru-cache": "^10.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
