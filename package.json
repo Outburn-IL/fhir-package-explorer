@@ -49,7 +49,7 @@
     "url": "git+https://github.com/Outburn-IL/fhir-package-explorer.git"
   },
   "dependencies": {
-    "fhir-package-installer": "^1.9.0",
+    "fhir-package-installer": "^1.10.0",
     "fs-extra": "^11.3.3"
   },
   "devDependencies": {
