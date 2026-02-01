@@ -3,6 +3,7 @@ import {
   FhirPackageInstaller
 } from 'fhir-package-installer';
 import path from 'path';
+import { LRUCache } from 'lru-cache';
 import type { FhirPackageIdentifier, Logger, FileInPackageIndex, FileIndexEntryWithPkg } from '@outburn/types';
 
 
@@ -14,9 +15,9 @@ export class FhirPackageExplorer {
   private fpi: FhirPackageInstaller;
   private cachePath: string;
   private logger: Logger;
-  private indexCache = new Map<string, FileIndexEntryWithPkg[]>();
-  private contentCache = new Map<string, any>();
-  private fastIndex = new Map<string, FileIndexEntryWithPkg[]>();
+  private indexCache: LRUCache<string, FileIndexEntryWithPkg[]>;
+  private contentCache: LRUCache<string, any>;
+  private fastIndex: LRUCache<string, FileIndexEntryWithPkg[]>;
   private contextPackages: FhirPackageIdentifier[] = [];
   private normalizedRootPackages: FhirPackageIdentifier[] = [];
   private skipExamples: boolean = false;
@@ -57,7 +58,16 @@ export class FhirPackageExplorer {
   }
 
   private constructor(config: ExplorerConfig) {
-    const { logger, registryUrl, registryToken, cachePath, skipExamples } = config || {} as ExplorerConfig;
+    const {
+      logger,
+      registryUrl,
+      registryToken,
+      cachePath,
+      skipExamples,
+      contentCacheSize,
+      indexCacheSize,
+      fastIndexSize
+    } = config || {} as ExplorerConfig;
     this.fpi = new FhirPackageInstaller({ logger, registryUrl, registryToken, cachePath, skipExamples });
     this.logger = logger || {
       debug: () => {},
@@ -67,6 +77,9 @@ export class FhirPackageExplorer {
     };
     this.cachePath = this.fpi.getCachePath();
     if (skipExamples) this.skipExamples = skipExamples;
+    this.contentCache = new LRUCache({ max: contentCacheSize ?? 500 });
+    this.indexCache = new LRUCache({ max: indexCacheSize ?? 500 });
+    this.fastIndex = new LRUCache({ max: fastIndexSize ?? 10000 });
   }
 
   public getCachePath(): string {
@@ -299,8 +312,9 @@ export class FhirPackageExplorer {
   private _buildFastIndex(index: FileIndexEntryWithPkg[]) {
     for (const file of index) {
       for (const key of getAllFastIndexKeys(file)) {
-        if (!this.fastIndex.has(key)) this.fastIndex.set(key, []);
-        this.fastIndex.get(key)!.push(file);
+        const entries = this.fastIndex.get(key) ?? [];
+        entries.push(file);
+        this.fastIndex.set(key, entries);
       }
     }
   }

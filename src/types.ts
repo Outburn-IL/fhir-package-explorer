@@ -8,6 +8,12 @@ export interface ExplorerConfig {
   cachePath?: string;
   context: Array<string | FhirPackageIdentifier>;
   skipExamples?: boolean;
+  /** Max number of full resource content entries to keep in memory. Default: 500. */
+  contentCacheSize?: number;
+  /** Max number of full package index lists to keep in memory. Default: 500. */
+  indexCacheSize?: number;
+  /** Max number of fast index keys to keep in memory. Default: 10000. */
+  fastIndexSize?: number;
   /** 
    * FHIR version to use when auto-adding core package if none is found in context.
    * Defaults to '4.0.1'. 
