@@ -1,6 +1,6 @@
 {
   "name": "fhir-package-explorer",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "description": "Explore and resolve FHIR conformance resources across package contexts",
   "main": "./dist/index.cjs",
   "module": "./dist/index.mjs",
@@ -49,9 +49,9 @@
     "url": "git+https://github.com/Outburn-IL/fhir-package-explorer.git"
   },
   "dependencies": {
-    "fhir-package-installer": "^1.10.0",
+    "fhir-package-installer": "^1.10.1",
     "fs-extra": "^11.3.3",
-    "lru-cache": "^10.4.3"
+    "lru-cache": "^11.2.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.24.0",
