@@ -20,6 +20,7 @@ export class FhirPackageExplorer {
   private fastIndex: LRUCache<string, FileIndexEntryWithPkg[]>;
   private contextPackages: FhirPackageIdentifier[] = [];
   private normalizedRootPackages: FhirPackageIdentifier[] = [];
+  private dependencyRootByPackageKey: Map<string, FhirPackageIdentifier> = new Map();
   private skipExamples: boolean = false;
 
   static async create(config: ExplorerConfig): Promise<FhirPackageExplorer> {
@@ -101,7 +102,9 @@ export class FhirPackageExplorer {
    */
   public async getDirectDependencies(pkg: string | FhirPackageIdentifier): Promise<FhirPackageIdentifier[]> {
     const pkgObj = typeof pkg === 'string' ? await this.fpi.toPackageObject(pkg) : pkg;
-    const dependencies = await this.fpi.getDependencies(pkgObj);
+    const dependencies = await this.fpi.getDependencies(pkgObj, {
+      rootPackage: this._getDependencyRoot(pkgObj)
+    });
     return Object.entries(dependencies).map(([id, version]) => ({ id, version }));
   }
   
@@ -112,8 +115,7 @@ export class FhirPackageExplorer {
    */
   public async expandPackageDependencies(pkg: string | FhirPackageIdentifier): Promise<FhirPackageIdentifier[]> {
     const pkgObj = typeof pkg === 'string' ? await this.fpi.toPackageObject(pkg) : pkg;
-    const expanded: string[] = Array.from(await this._collectDependencies(pkgObj));
-    return sortPackages(await Promise.all(expanded.map(async (p) => await this.fpi.toPackageObject(p))));
+    return sortPackages(await this._collectDependencyObjects(pkgObj));
   }
 
   public async lookup(filter: LookupFilter = {}): Promise<any[]> {
@@ -239,12 +241,12 @@ export class FhirPackageExplorer {
     const keyToPkg = new Map<string, FhirPackageIdentifier>();
     for (const root of initialRoots) {
       await this.fpi.install(root); // ensure root is installed before dependency walk
-      const closure = await this._collectDependencies(root); // Set of id#version (includes root)
+      const closurePackages = await this._collectDependencyObjects(root);
+      const closure = new Set(closurePackages.map((pkg) => `${pkg.id}#${pkg.version}`));
       rootClosures.set(`${root.id}#${root.version}`, closure);
       // Track all packages encountered for later object reconstruction
-      for (const key of closure) {
-        const [id, version] = key.split('#');
-        keyToPkg.set(key, { id, version });
+      for (const pkg of closurePackages) {
+        keyToPkg.set(`${pkg.id}#${pkg.version}`, pkg);
       }
     }
 
@@ -278,23 +280,34 @@ export class FhirPackageExplorer {
       }
     }
 
-    // Install all packages in final context to ensure downstream availability
-    for (const pkg of finalContextMap.values()) {
-      await this.fpi.install(pkg);
-    }
-
     // Store normalized roots (canonical ordering) and full context packages
     this.normalizedRootPackages = sortPackages(minimalRoots);
     this.contextPackages = sortPackages(Array.from(finalContextMap.values()));
+
+    this.dependencyRootByPackageKey.clear();
+    for (const root of this.normalizedRootPackages) {
+      const closure = rootClosures.get(`${root.id}#${root.version}`);
+      if (!closure) continue;
+      for (const key of closure) {
+        if (!this.dependencyRootByPackageKey.has(key)) {
+          this.dependencyRootByPackageKey.set(key, root);
+        }
+      }
+    }
+  }
+
+  private _getDependencyRoot(pkg: FhirPackageIdentifier): FhirPackageIdentifier {
+    return this.dependencyRootByPackageKey.get(`${pkg.id}#${pkg.version}`) ?? pkg;
   }
 
   private async _collectDependencies(pkg: FhirPackageIdentifier): Promise<Set<string>> {
     const visited = new Set<string>();
+    const rootPackage = this._getDependencyRoot(pkg);
     const visit = async (p: FhirPackageIdentifier) => {
       const key = `${p.id}#${p.version}`;
       if (visited.has(key)) return;
       visited.add(key);
-      const deps = await this.fpi.getDependencies(p);
+      const deps = await this.fpi.getDependencies(p, { rootPackage });
       for (const [id, version] of Object.entries(deps || {})) {
         if (this.skipExamples && id.includes('examples')) continue;
         await visit({ id, version });
@@ -302,6 +315,14 @@ export class FhirPackageExplorer {
     };
     await visit(pkg);
     return visited;
+  }
+
+  private async _collectDependencyObjects(pkg: FhirPackageIdentifier): Promise<FhirPackageIdentifier[]> {
+    const keys = await this._collectDependencies(pkg);
+    return sortPackages(Array.from(keys).map((key) => {
+      const [id, version] = key.split('#', 2);
+      return { id, version };
+    }));
   }
 
   private async _getFilePath(entry: FileIndexEntryWithPkg): Promise<string> {
