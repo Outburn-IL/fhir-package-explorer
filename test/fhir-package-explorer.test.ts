@@ -349,7 +349,7 @@ describe('FhirPackageExplorer', () => {
     expect(resolved.id).toBe('language');
     // Should now prefer implicit package (extensions) over core
     expect(resolved.__packageId).toBe('hl7.fhir.uv.extensions.r4');
-    expect(resolved.__packageVersion).toBe('5.2.0');
+    expect(resolved.__packageVersion).toBe('5.3.0');
     expect(resolved.url).toBe('http://hl7.org/fhir/StructureDefinition/language');
     expect(resolved.__filename).toBe('StructureDefinition-language.json');
   });
@@ -364,7 +364,7 @@ describe('FhirPackageExplorer', () => {
     expect(resolved.id).toBe('language');
     // Should now prefer implicit package (extensions) over core
     expect(resolved.__packageId).toBe('hl7.fhir.uv.extensions.r4');
-    expect(resolved.__packageVersion).toBe('5.2.0');
+    expect(resolved.__packageVersion).toBe('5.3.0');
     expect(resolved.url).toBe('http://hl7.org/fhir/StructureDefinition/language');
     expect(resolved.filename).toBe('StructureDefinition-language.json');
   });
